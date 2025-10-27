@@ -29,7 +29,9 @@
   .subtle{font-size:12px;color:var(--muted)}
   .hstack{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .ghost{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
-  .pill{display:inline-flex;gap:6px;align-items:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 8px}
+  .pill{display:inline-flex;gap:6px;align-items:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 8px;margin:4px 6px 0 0}
+  dialog[open]{z-index:9999}
+  .no-scroll{overflow:hidden}
   @media (min-width:900px){ .row{min-height:56px} }
 </style>
 </head>
@@ -54,7 +56,7 @@
 </header>
 
 <div class="wrap">
-  <div id="listTips" class="subtle">提示：横向滚动查看未来月份；鼠标放在金额块可查看具体信息。</div>
+  <div id="listTips" class="subtle">提示：横向滚动查看未来月份；鼠标放在金额块可查看具体信息（退回期在金额下方显示）。</div>
 </div>
 
 <div id="gridWrap">
@@ -70,7 +72,7 @@
     <div class="row2"><label>邮箱</label><input id="em" type="email" placeholder="you@example.com" required></div>
     <div class="row2"><label>密码</label><input id="pw" type="password" placeholder="至少 8 位" minlength="8" required></div>
     <div class="hstack" style="justify-content:flex-end;margin-top:8px">
-      <button class="btn" value="close">取消</button>
+      <button class="btn" type="button" id="authCancel">取消</button>
       <button type="button" class="btn" id="goReg">注册</button>
       <button type="button" class="btn pri" id="goLogin">登录</button>
     </div>
@@ -106,7 +108,7 @@
     </div>
 
     <div class="hstack" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn" value="close">取消</button>
+      <button class="btn" type="button" id="edCancel">取消</button>
       <button type="button" class="btn pri" id="btnSave">保存</button>
     </div>
   </form>
@@ -115,6 +117,22 @@
 <div id="toast" class="toast">已保存</div>
 
 <script>
+/* ---------- Dialog 安全降级 ---------- */
+function openDlg(el){
+  if(!el) return;
+  if(typeof el.showModal === 'function'){ try{ el.showModal(); return; }catch(e){} }
+  el.setAttribute('open','');
+  el.style.display='block';
+  document.body.classList.add('no-scroll');
+}
+function closeDlg(el){
+  if(!el) return;
+  if(typeof el.close === 'function'){ try{ el.close(); }catch(e){} }
+  el.removeAttribute('open');
+  el.style.display='none';
+  document.body.classList.remove('no-scroll');
+}
+
 /* ---------- 工具 ---------- */
 const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -124,8 +142,7 @@ function addMonths(d,n){const x=new Date(d);x.setMonth(x.getMonth()+n);return x}
 function toast(t){const el=$('#toast'); el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1200)}
 
 /* ---------- 配置：本地 / 线上 API ---------- */
-// API_BASE 为空=同域（推荐，部署到 Vercel 时直接用）。如果在本地 HTML 调用线上 API，填你的域名：
-// const API_BASE = "https://你的域名.vercel.app"; 
+// const API_BASE = "https://你的域名.vercel.app"; // 如在本地页面连线上 API
 const API_BASE = '';
 
 async function api(url, opts){
@@ -145,7 +162,7 @@ loadLocal();
 let ONLINE = false;
 async function checkLogin(){
   try{
-    const me = await api('/api/me'); // 返回 {uid}（已登录）
+    const me = await api('/api/me'); // 返回 {uid}
     ONLINE = true;
     $('#who').textContent = me.uid || '已登录';
     $('#btnLogin').style.display='none';
@@ -179,14 +196,15 @@ async function saveItemToBackend(it){
 }
 
 /* ---------- 登录 / 退出 ---------- */
-$('#btnLogin').onclick = ()=> $('#auth').showModal();
+$('#btnLogin').onclick = ()=> openDlg($('#auth'));
+$('#authCancel').onclick = ()=> closeDlg($('#auth'));
 $('#btnLogout').onclick = async ()=>{ try{ await api('/api/logout',{method:'POST'}); }catch{} checkLogin(); };
 
 $('#goLogin').onclick = async ()=>{
   const btn=$('#goLogin'), reg=$('#goReg'); btn.disabled=reg.disabled=true; $('#msg').textContent='';
   try{
     await api('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(),password:$('#pw').value})});
-    $('#auth').close(); await checkLogin();
+    closeDlg($('#auth')); await checkLogin();
   }catch(e){ $('#msg').textContent=e.message; } finally{ btn.disabled=reg.disabled=false; }
 };
 $('#goReg').onclick = async ()=>{
@@ -213,7 +231,7 @@ $('#btnAdd').onclick = ()=>{
   $('#f_notes').value=''; $('#f_bill').value=1; $('#f_wm').value=24;
   $('#phaseList').innerHTML=''; addPhase({fromMonth:1,amount:0});
   $('#cancelList').innerHTML='';
-  syncTypeUI(); $('#editor').showModal();
+  syncTypeUI(); openDlg($('#editor'));
 };
 
 function addPhase(init){ const div=document.createElement('div'); div.className='pill';
@@ -240,10 +258,11 @@ function readForm(){
   const cancels=[...$$('#cancelList .pill')].map(row=>({fromMonth:Number(row.querySelector('.fm').value)||1, toMonth:Number(row.querySelector('.tm').value)||1}));
   return { id: editingId||`it_${Date.now()}`, ...base, billingDay:Number($('#f_bill').value)||1, pricePhases:phases, cancelWindows:cancels, createdAt:Date.now() };
 }
+$('#edCancel').onclick = ()=> closeDlg($('#editor'));
 $('#btnSave').onclick = async ()=>{
   const it=readForm(); if(!it) return;
   const idx=items.findIndex(x=>x.id===it.id); if(idx>=0) items[idx]=it; else items.push(it);
-  saveLocal(); $('#editor').close(); if(ONLINE) try{await saveItemToBackend(it);}catch(e){console.warn(e)}
+  saveLocal(); closeDlg($('#editor')); if(ONLINE) try{await saveItemToBackend(it);}catch(e){console.warn(e)}
   toast('已保存'); render();
 };
 
@@ -275,7 +294,52 @@ function render(){
     info.querySelector('button').onclick=()=>openEdit(it);
     row.appendChild(info);
 
-    for(let i=0;i=0){
+    for(let i=0;i<mlist.length;i++){
+      const m0 = mlist[0];
+      const idx = i+1; // 从1开始的月序
+      const cell=document.createElement('div'); cell.className='cell'; cell.style.position='relative';
+
+      if(it.type==='plan'){
+        const price = resolvePlanPrice(it.pricePhases, idx);
+        if(price!=null){
+          const b=document.createElement('div');
+          b.style.position='absolute'; b.style.left='8px'; b.style.right='8px'; b.style.top='6px'; b.style.height='26px';
+          b.style.background='#ecfeff'; b.style.border='1px solid #a5f3fc'; b.style.borderRadius='8px'; b.style.display='flex'; b.style.alignItems='center'; b.style.justifyContent='center';
+          b.title=`¥ ${price.toLocaleString()} / 月`;
+          b.textContent=`¥ ${price.toLocaleString()}`;
+          cell.appendChild(b);
+
+          if(isInCancel(it.cancelWindows, idx)){
+            const tag=document.createElement('div');
+            tag.textContent='退回期';
+            tag.className='tag';
+            tag.style.position='absolute'; tag.style.left='50%'; tag.style.transform='translateX(-50%)';
+            tag.style.bottom='6px';
+            cell.appendChild(tag);
+          }
+        }
+      }else{
+        // warranty
+        const startIdx = 1;
+        const wm = Number(it.warrantyMonths||0);
+        const on = idx >= startIdx && idx < startIdx + wm;
+        if(on){
+          const g=document.createElement('div');
+          g.textContent='保修中';
+          g.className='tag';
+          g.style.position='absolute'; g.style.left='50%'; g.style.transform='translateX(-50%)';
+          g.style.top='10px';
+          cell.appendChild(g);
+        }
+      }
+
+      row.appendChild(cell);
+    }
+    grid.appendChild(row);
+  }
+
+  const iToday = mlist.findIndex(m=> m.getFullYear()===today.getFullYear() && m.getMonth()===today.getMonth());
+  if(iToday>=0){
     todayLine.style.display='block'; todayLine.style.left=`${iToday*COL_W+COL_W/2}px`;
   }else todayLine.style.display='none';
 }
@@ -287,11 +351,11 @@ function openEdit(it){
   $('#f_bill').value=it.billingDay||1; $('#f_wm').value=it.warrantyMonths||24;
   $('#phaseList').innerHTML=''; (it.pricePhases||[]).forEach(p=>addPhase(p));
   $('#cancelList').innerHTML=''; (it.cancelWindows||[]).forEach(c=>addCancel(c));
-  syncTypeUI(); $('#editor').showModal();
+  syncTypeUI(); openDlg($('#editor'));
 }
 
 $('#filter').oninput=render; $('#months').oninput=render;
-$('#btnToday').onclick=()=>{ wrap.scrollLeft=0; /* 可扩展为定位今天 */ };
+$('#btnToday').onclick=()=>{ wrap.scrollLeft=0; };
 
 checkLogin(); render();
 </script>
