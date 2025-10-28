@@ -5,37 +5,12 @@ const UPSTASH_REDIS_REST_URL =
   process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_REST_URL;
 const UPSTASH_REDIS_REST_TOKEN =
   process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_REST_TOKEN;
-const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
-function json(res, obj, code = 200) {
-  res.statusCode = code;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(obj));
-}
+function json(res,obj,code=200){res.statusCode=code;res.setHeader('content-type','application/json; charset=utf-8');res.end(JSON.stringify(obj));}
+async function readBody(req){const chunks=[];for await(const c of req) chunks.push(c);const raw=Buffer.concat(chunks).toString();try{return JSON.parse(raw||'{}')}catch{return {}}}
+function parseCookies(req){const h=req.headers.cookie||'';const m={};h.split(';').forEach(p=>{const i=p.indexOf('=');if(i>0)m[p.slice(0,i).trim()]=decodeURIComponent(p.slice(i+1))});return m;}
+function setCookie(res,name,value,opt={}){const a=[`${name}=${encodeURIComponent(value)}`];if(opt.maxAge)a.push(`Max-Age=${opt.maxAge}`);a.push('Path=/','SameSite=Lax','HttpOnly','Secure');res.setHeader('set-cookie',a.join('; '));}
 
-async function readBody(req) {
-  const chunks = [];
-  for await (const c of req) chunks.push(c);
-  const raw = Buffer.concat(chunks).toString();
-  try { return JSON.parse(raw || '{}'); } catch { return {}; }
-}
-
-function parseCookies(req) {
-  const h = req.headers.cookie || '';
-  const m = {};
-  h.split(';').forEach(p => {
-    const i = p.indexOf('=');
-    if (i > 0) m[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1));
-  });
-  return m;
-}
-
-function setCookie(res, name, value, opt = {}) {
-  const a = [`${name}=${encodeURIComponent(value)}`];
-  if (opt.maxAge) a.push(`Max-Age=${opt.maxAge}`);
-  a.push('Path=/', 'SameSite=Lax', 'HttpOnly', 'Secure');
-  res.setHeader('set-cookie', a.join('; '));
-}
 
 /** 兼容版：Upstash 官方推荐 GET 走 GET /get/<key>，避免某些 POST /get 不兼容 */
 async function redisGetCompat(key) {
@@ -55,32 +30,29 @@ async function redisGetCompat(key) {
   }
 }
 
-/** 其余命令仍走 POST + JSON 数组（Upstash 文档标准用法） */
-async function redis(cmd, ...args) {
-  const r = await fetch(
-    `${UPSTASH_REDIS_REST_URL}/${String(cmd).toLowerCase()}`,
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(args)
-    }
-  );
-  const d = await r.json();
-  if (!r.ok) throw new Error(d?.error || `Upstash ${cmd} failed`);
-  return d.result;
-}
-
-async function redisPipeline(commands) {
+async function redis(cmd, ...args){
   const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-      'content-type': 'application/json'
+      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
+      'content-type': 'application/json',
     },
-    body: JSON.stringify(commands)
+    body: JSON.stringify([[String(cmd).toUpperCase(), ...args]]),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d?.error || `Upstash ${cmd} failed`);
+  return Array.isArray(d) ? d[0]?.result : d.result; // 兼容返回形态
+}
+
+async function redisPipeline(commands){
+  const norm = commands.map(c => [String(c[0]).toUpperCase(), ...c.slice(1)]);
+  const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(norm),
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d?.error || 'Upstash pipeline failed');
