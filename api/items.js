@@ -1,9 +1,8 @@
-// api/items.js - Hash 存储
 const { json, readBody, getUserIdBySession, redis } = require('./_utils');
 
 module.exports = async (req, res) => {
   const uid = await getUserIdBySession(req);
-  if(!uid) return json(res,{error:'Unauthorized'},401);
+  if(!uid) return json(res,{error:'未登录'},401);
   const key = `items:${uid}`;
 
   if(req.method==='GET'){
@@ -37,5 +36,5 @@ module.exports = async (req, res) => {
     if(!n) return json(res,{error:'Not Found'},404);
     return json(res,{ok:true});
   }
-  return json(res,{error:'Method Not Allowed'},405);
+  return json(res,{error:'方法不允许'},405);
 };

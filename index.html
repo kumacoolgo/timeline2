@@ -35,7 +35,6 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 @media (max-width: 860px){
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
-  /* [修复] 移动端列表太矮的问题 */
   #leftWrap { max-height: 16vh; }
 }
 </style>
@@ -45,7 +44,6 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   <div class="header card">
     <div class="left">
       <b>费用时间轴</b>
-      <span id="modePill" class="pill small">本地模式</span>
       <input id="filter" placeholder="搜索项目/类型/编号..." style="width:240px"/>
       <div class="row">
         <label class="small">显示月数</label>
@@ -105,7 +103,10 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const COL_W=110; let items=[], activeId=null, editingId=null, ONLINE=false;
 function pad2(n){return (n<10?'0':'')+n;} function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
-function save(){ localStorage.setItem('timeline-items', JSON.stringify(items)); } function load(){ try{return JSON.parse(localStorage.getItem('timeline-items')||'[]')}catch{return []} }
+
+function save(){ /* no-op */ }
+function load(){ return []; }
+
 function syncTypeUI(){ const t=$('#f_type').value; $('#blockPlan').style.display=(t==='plan'||t==='insurance')?'block':'none'; $('#blockWarranty').style.display=(t==='warranty')?'block':'none'; }
 function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type=number min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type=number value="${i?.amount||0}"><span class=small>日元/月</span><button class="ghost del" type=button>删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type=number min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type=number min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="ghost del" type=button>删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
@@ -114,9 +115,8 @@ function readForm(){ const type=$('#f_type').value.trim(), name=$('#f_name').val
 function fillForm(it){ $('#f_type').value=it?.type||'plan'; $('#f_name').value=it?.name||''; $('#f_number').value=it?.number||''; $('#f_start').value=it?.startDate||''; $('#f_bill').value=it?.billingDay||1; $('#f_wm').value=it?.warrantyMonths||24; $('#phaseList').innerHTML=''; $('#cancelList').innerHTML=''; (it?.pricePhases?.length?it.pricePhases:[{fromMonth:1,amount:0}]).forEach(addPhase); (it?.cancelWindows||[]).forEach(addCancel); syncTypeUI(); }
 function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a } function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
-function render(){ const L=$('#leftWrap'); L.innerHTML = items.map(it=>`<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}"><div><div class=title>${it.name} ${it.type==='plan'?'<span class=small style=color:#6b5cff>套餐</span>':it.type==='insurance'?'<span class=small style=color:#10b981>保险</span>':'<span class=small style=color:#3b82f6>保修</span>'}</div><div class=meta>#${it.number||'-'}　开始: ${it.startDate||'-'}</div></div><div class=ops><button class="ghost btnEdit" data-id="${it.id}" type=button>编辑</button><button class="ghost btnDel" data-id="${it.id}" type=button>删除</button></div></div>`).join(''); L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=items.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); L.querySelectorAll('.btnDel').forEach(b=> b.onclick=e=>{e.stopPropagation(); if(!confirm('确定删除该项目？'))return; const id=b.dataset.id; items=items.filter(x=>x.id!==id); if(activeId===id) activeId=items[0]?.id||null; save(); render();}); const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>还没有项目，点击右上角“添加项目”。</div>'; return } const months=Number($('#months').value)||24; const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; head.innerHTML=mlist.map(m=>{const q=Math.ceil((m.getMonth()+1)/3); return `<div class="cell nowrap" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`}).join(''); grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; const it=data[0]; const m0=startOfMonth(new Date(it.startDate)); const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; const cells=[]; for(let i=0;i<mlist.length;i++){ const idx=MonthIndex(mlist[i]); if(it.type==='warranty'){ const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); cells.push(`<div class=cell style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); }else{ const amount=resolvePlanPrice(it.pricePhases,idx); const cancel=isInCancel(it.cancelWindows,idx); cells.push(`<div class=cell style="text-align:center">${cancel?'<div class="badge cancel">退会期</div>':''}${amount!=null?`<div class=badge>￥ ${amount.toLocaleString()}</div>`:''}</div>`); } } grid.innerHTML=cells.join(''); }
-$('#f_type').onchange=syncTypeUI; $('#btnAdd').onclick=()=>{ editingId=null; fillForm(null); $('#dlgTitle').textContent='新增项目'; $('#dlg').style.display='flex'; }; $('#btnClose').onclick=()=>$('#dlg').style.display='none'; $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; }); $('#btnSave').onclick=()=>{ const it=readForm(); if(!it) return; const idx=items.findIndex(x=>x.id===it.id); if(idx>=0) items[idx]=it; else items.push(it); if(!activeId) activeId=it.id; save(); $('#dlg').style.display='none'; render(); };
-$('#btnToday').onclick=()=>alert('已定位到时间轴起点（从第一个项目的开始月）。');
+function render(){ const L=$('#leftWrap'); L.innerHTML = items.map(it=>`<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}"><div><div class=title>${it.name} ${it.type==='plan'?'<span class=small style=color:#6b5cff>套餐</span>':it.type==='insurance'?'<span class=small style=color:#10b981>保险</span>':'<span class=small style=color:#3b82f6>保修</span>'}</div><div class=meta>#${it.number||'-'}　开始: ${it.startDate||'-'}</div></div><div class=ops><button class="ghost btnEdit" data-id="${it.id}" type=button>编辑</button><button class="ghost btnDel" data-id="${it.id}" type=button>删除</button></div></div>`).join(''); L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=items.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); L.querySelectorAll('.btnDel').forEach(b=> b.onclick=e=>{e.stopPropagation(); if(!ONLINE){ alert('请先登录后再删除'); return; } if(!confirm('确定删除该项目？'))return; const id=b.dataset.id; deleteRemoteItem(id).then(()=>{ items=items.filter(x=>x.id!==id); if(activeId===id) activeId=items[0]?.id||null; render(); });}); const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>还没有项目，点击右上角“添加项目”。</div>'; return } const months=Number($('#months').value)||24; const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; head.innerHTML=mlist.map(m=>{const q=Math.ceil((m.getMonth()+1)/3); return `<div class="cell nowrap" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`}).join(''); grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; const it=data[0]; const m0=startOfMonth(new Date(it.startDate)); const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; const cells=[]; for(let i=0;i<mlist.length;i++){ const idx=MonthIndex(mlist[i]); if(it.type==='warranty'){ const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); cells.push(`<div class=cell style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); }else{ const amount=resolvePlanPrice(it.pricePhases,idx); const cancel=isInCancel(it.cancelWindows,idx); cells.push(`<div class=cell style="text-align:center">${cancel?'<div class="badge cancel">退会期</div>':''}${amount!=null?`<div class=badge>￥ ${amount.toLocaleString()}</div>`:''}</div>`); } } grid.innerHTML=cells.join(''); }
+
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
@@ -128,27 +128,66 @@ async function api(path, init){
   return data;
 }
 
+async function pullItems(){ const list = await api('/api/items', { method:'GET' }); return Array.isArray(list) ? list : []; }
+async function createRemoteItem(it){ return await api('/api/items', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(it) }); }
+async function updateRemoteItem(it){ await api('/api/items?id='+encodeURIComponent(it.id), { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify(it) }); }
+async function deleteRemoteItem(id){ await api('/api/items?id='+encodeURIComponent(id), { method:'DELETE' }); }
 
-$('#btnAuth').onclick=()=>{ $('#em').value=''; $('#pw').value=''; $('#msg').textContent=''; $('#dlgAuth').style.display='flex'; }; $('#btnAuthCancel').onclick=()=>$('#dlgAuth').style.display='none';
-$('#goReg').onclick=async()=>{ const b=$('#goReg'); b.disabled=true; try{ await api('/api/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(), password:$('#pw').value})}); $('#msg').style.color='#16a34a'; $('#msg').textContent='注册成功，请点击登录'; }catch(e){ $('#msg').style.color='#ef4444'; $('#msg').textContent=e.message||'注册失败'; } finally{ b.disabled=false; } }
+$('#btnAuth').onclick=()=>{ $('#em').value=''; $('#pw').value=''; $('#msg').textContent=''; $('#dlgAuth').style.display='flex'; };
+$('#btnAuthCancel').onclick=()=>$('#dlgAuth').style.display='none';
+
+$('#goReg').onclick=async()=>{
+  const b=$('#goReg'); b.disabled=true;
+  try{
+    await api('/api/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(), password:$('#pw').value})});
+    $('#msg').style.color='#16a34a'; $('#msg').textContent='注册成功，请点击登录';
+  }catch(e){ $('#msg').style.color='#ef4444'; $('#msg').textContent=e.message||'注册失败'; }
+  finally{ b.disabled=false; }
+};
+
 $('#goLogin').onclick = async ()=>{
   const b=$('#goLogin'); b.disabled=true;
   try{
-    await api('/api/login',{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body: JSON.stringify({ email: $('#em').value.trim(), password: $('#pw').value })
-    });
-    ONLINE=true; $('#modePill').textContent='云端'; $('#dlgAuth').style.display='none';
+    await api('/api/login',{ method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ email: $('#em').value.trim(), password: $('#pw').value }) });
+    ONLINE = true;
+    $('#dlgAuth').style.display='none';
+    $('#btnAuth').textContent = '已登录';
+    items = await pullItems();
+    activeId = items[0]?.id || null;
+    render();
   }catch(e){
-    $('#msg').style.color='#ef4444';
-    $('#msg').textContent = e.message || '登录失败';
+    $('#msg').style.color='#ef4444'; $('#msg').textContent = e.message || '登录失败';
   }finally{ b.disabled=false; }
 };
 
+$('#btnAdd').onclick=()=>{
+  if(!ONLINE){ alert('请先登录后再添加项目'); return; }
+  editingId=null; fillForm(null); $('#dlgTitle').textContent='新增项目'; $('#dlg').style.display='flex';
+};
 
+$('#btnClose').onclick=()=>$('#dlg').style.display='none';
+$('#btnCancel').onclick=()=>$('#dlg').style.display='none';
+$('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
 
-function bootstrap(){ items=load(); if(items.length===0){ items=[ {id:'demo1',type:'plan',name:'乐天1',number:'07012345678',startDate:'2025-02-01',billingDay:1,pricePhases:[{fromMonth:1,amount:1000}],cancelWindows:[{fromMonth:20,toMonth:22}]}, {id:'demo2',type:'warranty',name:'冰箱',number:'',startDate:'2020-01-01',warrantyMonths:24} ]; save(); } activeId=items[0]?.id||null; render(); }
+$('#btnSave').onclick=async()=>{
+  if(!ONLINE){ alert('请先登录后再保存'); return; }
+  const it=readForm(); if(!it) return;
+  if(!editingId){
+    const saved = await createRemoteItem(it);
+    items.push(saved);
+    activeId = saved.id;
+  }else{
+    await updateRemoteItem(it);
+    const idx=items.findIndex(x=>x.id===it.id);
+    if(idx>=0) items[idx]=it;
+  }
+  $('#dlg').style.display='none';
+  render();
+};
+
+$('#btnToday').onclick=()=>alert('已定位到时间轴起点（从第一个项目的开始月）。');
+
+function bootstrap(){ items=[]; activeId=null; render(); }
 bootstrap();
 </script>
 

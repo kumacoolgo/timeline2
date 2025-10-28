@@ -1,9 +1,7 @@
-// api/me.js
 const { json, getUserIdBySession, redis } = require('./_utils');
-
-module.exports = async (req, res) => {
+module.exports = async (req,res)=>{
   const uid = await getUserIdBySession(req);
-  if(!uid) return json(res,{error:'Unauthorized'},401);
+  if(!uid) return json(res,{error:'未登录'},401);
   const email = await redis('get', `user:uid:${uid}`);
   return json(res,{uid, email: email||null});
 };
