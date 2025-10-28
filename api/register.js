@@ -1,13 +1,20 @@
 const { json, readBody, createUser, checkRateLimit } = require('./_utils');
 
+function normalizeEmail(s = '') {
+  return String(s).trim().toLowerCase();
+}
+function normalizePassword(s = '') {
+  // 规范化并去掉“各种空白”的首尾：含 \u3000 全角空格、NBSP 等
+  return String(s).normalize('NFKC').replace(/^\s+|\s+$/gu, '');
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return json(res, { error: 'Method Not Allowed' }, 405);
   if (!await checkRateLimit(req)) return json(res, { error: '请求过于频繁' }, 429);
 
   const body = await readBody(req);
-  const email = (body?.email || '').trim();
-  // 统一：注册时对密码 trim，防止把不可见空格写进库
-  const password = String(body?.password || '').trim();
+  const email = normalizeEmail(body?.email || '');
+  const password = normalizePassword(body?.password || '');
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!email || !emailRegex.test(email) || password.length < 8) {
