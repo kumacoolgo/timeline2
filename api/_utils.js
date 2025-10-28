@@ -1,138 +1,301 @@
+// api/_utils.js
+// Node 18+ (Vercel) CommonJS
+
 const crypto = require('crypto');
 
-const {
-  UPSTASH_REDIS_REST_URL = '',
-  UPSTASH_REDIS_REST_TOKEN = '',
-  SESSION_TTL_SECONDS = '1209600',
-} = process.env;
+/* =================== 基础工具 =================== */
+function json(res, body, status = 200) {
+  res.statusCode = status;
+  res.setHeader('content-type', 'application/json; charset=utf-8');
+  res.setHeader('cache-control', 'public, max-age=0, must-revalidate');
+  res.end(JSON.stringify(body));
+}
 
-const TTL = parseInt(SESSION_TTL_SECONDS, 10) || 1209600;
+function parseCookies(req) {
+  const raw = req.headers.cookie || '';
+  const out = {};
+  raw.split(/; */).forEach(kv => {
+    if (!kv) return;
+    const idx = kv.indexOf('=');
+    if (idx < 0) return;
+    const k = decodeURIComponent(kv.slice(0, idx).trim());
+    const v = decodeURIComponent(kv.slice(idx + 1).trim());
+    out[k] = v;
+  });
+  return out;
+}
+
+function setCookie(res, name, value, opts = {}) {
+  const parts = [`${encodeURIComponent(name)}=${encodeURIComponent(value)}`];
+  if (opts.maxAge != null) parts.push(`Max-Age=${Math.floor(opts.maxAge)}`);
+  if (opts.domain) parts.push(`Domain=${opts.domain}`);
+  if (opts.path) parts.push(`Path=${opts.path}`);
+  if (opts.expires) parts.push(`Expires=${opts.expires.toUTCString()}`);
+  if (opts.httpOnly) parts.push('HttpOnly');
+  if (opts.secure) parts.push('Secure');
+  if (opts.sameSite) parts.push(`SameSite=${opts.sameSite}`);
+  const prev = res.getHeader('Set-Cookie');
+  if (prev) {
+    const arr = Array.isArray(prev) ? prev.concat(parts.join('; ')) : [prev, parts.join('; ')];
+    res.setHeader('Set-Cookie', arr);
+  } else {
+    res.setHeader('Set-Cookie', parts.join('; '));
+  }
+}
+
+async function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', c => (data += c));
+    req.on('end', () => {
+      if (!data) return resolve({});
+      try {
+        resolve(JSON.parse(data));
+      } catch (e) {
+        resolve({});
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/* =================== Upstash Redis =================== */
 
 async function redis(cmd, ...args) {
-  const r = await fetch(`${UPSTASH_REDIS_REST_URL}/${cmd.toLowerCase()}`, {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error('Upstash credentials missing');
+  const r = await fetch(`${url}/${String(cmd).toLowerCase()}`, {
     method: 'POST',
     headers: {
-      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-      'content-type': 'application/json'
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
     },
-    body: JSON.stringify(args)
+    body: JSON.stringify(args),
   });
-  const data = await r.json().catch(() => ({}));
+  const data = await r.json();
   if (!r.ok) throw new Error(data?.error || `Upstash ${cmd} failed`);
   return data.result;
 }
 
 async function redisPipeline(commands) {
-  const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error('Upstash credentials missing');
+  const r = await fetch(`${url}/pipeline`, {
     method: 'POST',
     headers: {
-      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-      'content-type': 'application/json'
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
     },
-    body: JSON.stringify(commands)
+    body: JSON.stringify(commands),
   });
-  const data = await r.json().catch(() => []);
-  if (!r.ok) throw new Error(data?.error || `Upstash pipeline failed`);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.error || 'Upstash pipeline failed');
   return data.map(x => x.result);
 }
 
-function json(res, data, status = 200) {
-  res.statusCode = status;
-  res.setHeader('content-type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(data));
+/* =================== 安全/认证 =================== */
+
+const PBKDF2_ITER = Number(process.env.PBKDF2_ITER || 210000);
+const PBKDF2_LEN = 32;           // 256-bit
+const PBKDF2_DIGEST = 'sha256';  // 安全 & 快
+
+// v1$ITER$SALT$HEX
+function hashPassword(password, salt) {
+  const buf = crypto.pbkdf2Sync(
+    String(password),
+    String(salt),
+    PBKDF2_ITER,
+    PBKDF2_LEN,
+    PBKDF2_DIGEST
+  );
+  return `v1$${PBKDF2_ITER}$${salt}$${buf.toString('hex')}`;
 }
 
-function parseCookies(req) {
-  const hdr = req.headers.cookie || '';
-  const out = {};
-  hdr.split(';').forEach(p => {
-    const i = p.indexOf('=');
-    if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+/**
+ * 兼容校验：
+ * - v1$iter$salt$hex （当前格式）
+ * - 旧格式 "iter:salt:hex"
+ * - 极旧格式 "salt$hex" 或 "salt:hex"
+ * - 仅 hex（无法校验，返回 false）
+ */
+function verifyPassword(password, stored) {
+  if (!stored) return false;
+  const s = String(stored);
+
+  // v1$iter$salt$hex
+  if (s.startsWith('v1$')) {
+    const arr = s.split('$'); // ['v1', iter, salt, hex]
+    if (arr.length !== 4) return false;
+    const iter = Number(arr[1]) || PBKDF2_ITER;
+    const salt = arr[2];
+    const hex = arr[3];
+    const buf = crypto.pbkdf2Sync(
+      String(password),
+      String(salt),
+      iter,
+      Buffer.from(hex, 'hex').length,
+      PBKDF2_DIGEST
+    );
+    return crypto.timingSafeEqual(buf, Buffer.from(hex, 'hex'));
+  }
+
+  // iter:salt:hex
+  if (/^\d+:[^:]+:[a-f0-9]+$/i.test(s)) {
+    const [iterStr, salt, hex] = s.split(':');
+    const iter = Number(iterStr) || PBKDF2_ITER;
+    const buf = crypto.pbkdf2Sync(
+      String(password),
+      String(salt),
+      iter,
+      Buffer.from(hex, 'hex').length,
+      PBKDF2_DIGEST
+    );
+    return crypto.timingSafeEqual(buf, Buffer.from(hex, 'hex'));
+  }
+
+  // salt$hex 或 salt:hex
+  if (/^[^:$]+[:$][a-f0-9]+$/i.test(s)) {
+    const sep = s.includes('$') ? '$' : ':';
+    const [salt, hex] = s.split(sep);
+    const buf = crypto.pbkdf2Sync(
+      String(password),
+      String(salt),
+      PBKDF2_ITER,
+      Buffer.from(hex, 'hex').length,
+      PBKDF2_DIGEST
+    );
+    return crypto.timingSafeEqual(buf, Buffer.from(hex, 'hex'));
+  }
+
+  // 仅 hex：无法得知盐，判失败
+  return false;
+}
+
+function genSalt(len = 16) {
+  return crypto.randomBytes(len).toString('hex');
+}
+
+function uid(n = 20) {
+  return crypto.randomBytes(n).toString('hex');
+}
+
+function normEmail(s = '') {
+  return String(s).trim().toLowerCase();
+}
+
+/* =================== 会话 =================== */
+
+const COOKIE_NAME = 'sid';
+// 优先支持秒，便于更精准；否则兼容天
+const TTL_SECONDS =
+  Number(process.env.SESSION_TTL_SECONDS) ||
+  (Number(process.env.SESSION_TTL_DAYS || 14) * 86400);
+
+async function createSession(res, userId) {
+  const sid = uid(16);
+  await redis('set', `session:${sid}`, userId);
+  await redis('expire', `session:${sid}`, TTL_SECONDS);
+
+  setCookie(res, COOKIE_NAME, sid, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: TTL_SECONDS,
   });
-  return out;
+  return sid;
 }
 
-function setCookie(res, name, val, opt = {}) {
-  const parts = [`${name}=${encodeURIComponent(val)}`];
-  if (opt.httpOnly !== false) parts.push('HttpOnly');
-  parts.push('Path=/');
-  parts.push('SameSite=Lax');
-  if (opt.maxAge) parts.push(`Max-Age=${opt.maxAge}`);
-  if (opt.secure !== false) parts.push('Secure');
-  res.setHeader('set-cookie', parts.join('; '));
-}
-
-async function readBody(req) {
-  const bufs = [];
-  for await (const ch of req) bufs.push(ch);
-  const s = Buffer.concat(bufs).toString('utf8') || '{}';
-  try { return JSON.parse(s); } catch { return {}; }
-}
-
-function normEmail(e=''){ return String(e).trim().toLowerCase(); }
-function uid(){ return crypto.randomUUID?.() || ('u_' + Date.now().toString(36)+Math.random().toString(36).slice(2,8)); }
-function genSalt(n=16){ return crypto.randomBytes(n).toString('hex'); }
-function hashPassword(pw, salt){
-  const iters = 210000;
-  const key = crypto.pbkdf2Sync(String(pw), String(salt), iters, 32, 'sha256');
-  return `pbkdf2$${iters}$${salt}$${key.toString('hex')}`;
-}
-function verifyPassword(pw, hash){
-  const [algo, itersStr, salt, digest] = String(hash).split('$');
-  if (algo!=='pbkdf2') return false;
-  const iters = parseInt(itersStr,10)||210000;
-  const key = crypto.pbkdf2Sync(String(pw), String(salt), iters, 32, 'sha256').toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(key,'hex'), Buffer.from(digest,'hex'));
-}
-
-async function checkRateLimit(req) {
-  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
-  const k = `rl:${ip}`;
-  try{
-    const [cnt] = await redisPipeline([['INCR', k], ['EXPIRE', k, 60]]);
-    return (cnt <= 30);
-  }catch{ return true; }
-}
-
-async function getUserByEmail(email) {
-  const key = `user:email:${normEmail(email)}`;
-  const s = await redis('GET', key);
-  return s ? JSON.parse(s) : null;
-}
-async function createUser(email, password) {
-  email = normEmail(email);
-  const key = `user:email:${email}`;
-  const exists = await redis('EXISTS', key);
-  if (exists) return { error: '邮箱已存在' };
-  const salt = genSalt();
-  const hash = hashPassword(password, salt);
-  const user = { uid: uid(), email, salt, hash, createdAt: Date.now() };
-  await redisPipeline([
-    ['SET', key, JSON.stringify(user)],
-    ['SET', `user:uid:${user.uid}`, user.email]
-  ]);
-  return { user };
-}
-async function createSession(res, uid) {
-  const sid = 's_' + crypto.randomBytes(18).toString('hex');
-  await redisPipeline([['SET', `sid:${sid}`, uid], ['EXPIRE', `sid:${sid}`, TTL]]);
-  setCookie(res, 'sid', sid, { maxAge: TTL });
-}
 async function destroySession(req, res) {
-  const sid = parseCookies(req).sid;
-  if (sid) await redis('DEL', `sid:${sid}`);
-  setCookie(res, 'sid', '', { maxAge: 0 });
+  const sid = parseCookies(req)[COOKIE_NAME];
+  if (sid) {
+    await redis('del', `session:${sid}`).catch(() => {});
+    // 清除 cookie
+    setCookie(res, COOKIE_NAME, '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 0,
+      expires: new Date(0),
+    });
+  }
 }
+
 async function getUserIdBySession(req) {
-  const sid = parseCookies(req).sid;
+  const sid = parseCookies(req)[COOKIE_NAME];
   if (!sid) return null;
-  const uid = await redis('GET', `sid:${sid}`);
+  const uid = await redis('get', `session:${sid}`);
   return uid || null;
 }
 
+/* =================== 速率限制（简单按 IP） =================== */
+
+async function checkRateLimit(req) {
+  const ip =
+    (req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    'unknown';
+
+  try {
+    const key = `limit:ip:${ip}`;
+    const [count] = await redisPipeline([
+      ['incr', key],
+      ['expire', key, 60], // 60 秒窗口
+    ]);
+    return Number(count) <= 20; // 每分钟最多 20 次
+  } catch {
+    // Redis 异常时放行，避免把可用性搞挂
+    return true;
+  }
+}
+
+/* =================== 用户存取 =================== */
+
+async function createUser(email, password) {
+  email = normEmail(email);
+  const key = `user:email:${email}`;
+  const exists = await redis('exists', key);
+  if (exists) return { error: '邮箱已存在' };
+
+  const salt = genSalt();
+  const hash = hashPassword(password, salt); // hash 内嵌版本/迭代/盐
+  const user = {
+    uid: uid(),
+    email,
+    salt,        // 冗余保存，方便极端情况迁移
+    hash,
+    createdAt: Date.now(),
+  };
+
+  await redisPipeline([
+    ['set', key, JSON.stringify(user)],
+    ['set', `user:uid:${user.uid}`, user.email],
+  ]);
+
+  return { user };
+}
+
+async function getUserByEmail(email) {
+  const raw = await redis('get', `user:email:${normEmail(email)}`);
+  return raw ? JSON.parse(raw) : null;
+}
+
+/* =================== 导出 =================== */
+
 module.exports = {
-  json, readBody, parseCookies, setCookie, redis, redisPipeline,
-  normEmail, uid, genSalt, hashPassword, verifyPassword,
-  createUser, getUserByEmail, createSession, destroySession, getUserIdBySession,
-  TTL, checkRateLimit
+  // 基础
+  json, readBody, parseCookies, setCookie,
+  // Redis
+  redis, redisPipeline,
+  // 安全
+  genSalt, uid, hashPassword, verifyPassword, normEmail,
+  // 会话
+  createSession, destroySession, getUserIdBySession, TTL: TTL_SECONDS,
+  // 速率限制
+  checkRateLimit,
+  // 用户
+  createUser, getUserByEmail,
 };

@@ -1,10 +1,7 @@
 const { json, readBody, createUser, checkRateLimit } = require('./_utils');
 
-function normalizeEmail(s = '') {
-  return String(s).trim().toLowerCase();
-}
+function normalizeEmail(s = '') { return String(s).trim().toLowerCase(); }
 function normalizePassword(s = '') {
-  // 规范化并去掉“各种空白”的首尾：含 \u3000 全角空格、NBSP 等
   return String(s).normalize('NFKC').replace(/^\s+|\s+$/gu, '');
 }
 
