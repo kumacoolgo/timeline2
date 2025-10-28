@@ -1,49 +1,51 @@
-const { json } = require('./_utils');
+// api/debug.js
+const { json, redis, normEmail } = require('./_utils');
 
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_REST_URL;
-const TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_REST_TOKEN;
-
-// 走 pipeline 的小工具
-async function pipe(cmds){
-  const r = await fetch(`${REDIS_URL}/pipeline`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' },
-    body: JSON.stringify(cmds.map(c => [String(c[0]).toUpperCase(), ...c.slice(1)])),
-  });
-  const d = await r.json();
-  if(!r.ok) throw new Error(d?.error || 'pipeline failed');
-  return d.map(x => x.result);
-}
-
-module.exports = async (req,res)=>{
-  try{
-    const u = new URL(req.url, 'http://x');
-    const email = (u.searchParams.get('email')||'').trim().toLowerCase();
+module.exports = async (req, res) => {
+  try {
+    const q = new URL(req.url, 'http://x'); // 一定要 new URL
+    const email = normEmail(q.searchParams.get('email') || '');
     const key = email ? `user:email:${email}` : null;
 
+    // 环境检查
     const env = {
-      hasUrl: !!REDIS_URL, hasToken: !!TOKEN,
-      vercelEnv: process.env.VERCEL_ENV || process.env.NODE_ENV,
-      dbUrlHash: REDIS_URL ? REDIS_URL.replace(/^https?:\/\//,'').slice(0,24)+'…' : null
+      hasUrl: !!process.env.UPSTASH_REDIS_REST_URL,
+      hasToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+      vercelEnv: process.env.VERCEL_ENV || 'unknown',
+      dbUrlHash: (process.env.UPSTASH_REDIS_REST_URL || '').split('://')[1]?.slice(0, 24) + '…'
     };
 
-    let ping = null; try{ ping = (await pipe([['PING']]))[0]; } catch(e){ ping = 'ERR:'+e.message }
+    // 轻量 ping
+    let ping = [];
+    try {
+      ping = await redis('ping'); // Upstash 支持 ping
+    } catch (e) {}
 
-    let exists=null, sample=null, echoWriteRead=null;
-    if(key){
-      try{
-        const v = (await pipe([['GET', key]]))[0];
-        exists = !!v; sample = v ? JSON.parse(v) : null;
-      }catch{ exists=false; sample=null }
-      try{
-        const tkey=`__debug_${Date.now()}`, tval=`ts:${Date.now()}`;
-        const [ok1, got, ok3] = await pipe([['SET', tkey, tval], ['GET', tkey], ['DEL', tkey]]);
-        echoWriteRead = { wrote:tval, read:got, same: got===tval, setOk: ok1, delOk: ok3 };
-      }catch(e){ echoWriteRead = { err: String(e) } }
+    // 读用户
+    let exists = false, sample = null, err = null;
+    if (key) {
+      try {
+        const raw = await redis('get', key);
+        if (raw) {
+          exists = true;
+          sample = JSON.parse(raw);
+        }
+      } catch (e) { err = e.message || String(e); }
     }
 
-    return json(res, { env, ping, queryEmail: email||null, key, exists, sample, echoWriteRead });
-  }catch(e){
-    return json(res, { error: e.message || 'debug_error' }, 500);
+    // 验证一次 set/get（严格用字符串，避免“参数个数错误”）
+    let echo = null;
+    try {
+      const ek = 'echo:' + Date.now();
+      await redis('set', ek, 'ok');       // set 只允许 key + value（都是字符串）
+      const got = await redis('get', ek); // should be 'ok'
+      echo = { wrote: 'ok', read: got };
+    } catch (e) {
+      echo = { err: e.message || String(e) };
+    }
+
+    return json(res, { env, ping: Array.isArray(ping)?ping:[], queryEmail: email, key, exists, sample, echo });
+  } catch (e) {
+    return json(res, { error: e.message || String(e) }, 500);
   }
 };
