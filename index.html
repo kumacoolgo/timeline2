@@ -1,266 +1,358 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-  <title>费用 & 保修管理时间轴（单文件 / 无后端 + 可登录云端）</title>
-  <style>
-    :root{
-      --bg:#f7f8fb;
-      --card:#fff;
-      --fg:#1f2937;
-      --muted:#6b7280;
-      --brand:#2563eb;
-      --chip-bg:#ecf5ff;
-      --chip-outline:#c7d7ff;
-      --cell-w: 110px;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto}
-    .container{max-width:1200px;margin:22px auto;padding:0 12px}
-    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .btn{padding:8px 12px;border-radius:10px;border:1px solid #d6dae3;background:#fff;cursor:pointer}
-    .btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}
-    .btn.ghost{background:#fff;border-color:#e5e7eb;color:var(--fg)}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    input,select,textarea{padding:9px 10px;border:1px solid #d6dae3;border-radius:10px;background:#fff;min-width:0}
-    .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#eef2ff;color:#3b82f6;border:1px solid #c7d7ff}
-    .muted{color:#6b7280}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 1px 0 rgba(0,0,0,.02)}
-    .left{width:280px;flex:0 0 280px}
-    .right{min-width:0;overflow:hidden}
-    .toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
-    .search{flex:1;min-width:220px}
-    .pill{padding:6px 10px;border-radius:999px;border:1px solid #dbe2f1;background:#fff}
-    #gridWrap{overflow:auto;border:1px solid #e5e7eb;border-radius:14px;background:#fff}
-    #gridHead, #grid{display:grid;grid-auto-rows:minmax(86px,auto)}
-    #gridHead .cell{border-bottom:1px solid #eef1f7;border-right:1px solid #eef1f7;padding:8px 6px;background:#fbfcff}
-    #grid .cell{border-right:1px solid #f0f3fa;position:relative}
-    .nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .chip{display:inline-flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;padding:8px 10px;border-radius:10px;border:1px solid var(--chip-outline);background:var(--chip-bg);min-width:72px}
-    .chip .sub{font-size:12px;color:#475569}
-    .todayLine{position:absolute;top:0;bottom:0;width:2px;background:#2563eb;pointer-events:none}
-    .leftList .item{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px dashed #edf0f6}
-    .leftList .item.dragging{opacity:.6}
-    .leftList .name{font-weight:600}
-    .leftList .meta{font-size:12px;color:#64748b}
-    .leftList .actions{margin-left:auto;display:flex;gap:8px}
-    .small{font-size:12px;color:#64748b}
-    .hint{margin:8px 0 0 6px;color:#64748b}
-    .hidden{display:none}
-    dialog{border:none;border-radius:16px;max-width:680px;width:92vw;padding:0}
-    dialog .dlg-body{padding:18px}
-    dialog .dlg-foot{padding:14px 18px;border-top:1px solid #eef2f8;display:flex;justify-content:flex-end;gap:10px;background:#fbfcff;border-radius:0 0 16px 16px}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .form-row{display:flex;flex-direction:column;gap:6px}
-    @media (max-width: 760px){
-      .container{padding:0 8px}
-      .left{width:100%;flex:1 1 auto}
-      .right{width:100%}
-      .grid2{grid-template-columns:1fr}
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>费用 & 保修管理时间轴（单文件/无后端 + 可登录云端）</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#fff; --txt:#1f2937; --muted:#6b7280;
+    --line:#e5e7eb; --brand:#2563eb; --ok:#0ea5e9; --chip:#eef2ff;
+    --cancel:#fff7ed; --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+  a{color:var(--brand);text-decoration:none}
+
+  header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+  .toolbar{display:flex;gap:8px;align-items:center;max-width:1200px;margin:0 auto;padding:12px 16px;flex-wrap:wrap}
+  .toolbar .sp{flex:1}
+  input,button,select{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;font:inherit}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  button.ghost{background:#fff}
+  .badge{display:inline-block;min-width:2em;padding:2px 8px;border-radius:999px;background:#eef2f7;color:#334155;font-size:12px}
+
+  /* ======= 布局：左列表 + 右时间轴 ======= */
+  .layout{max-width:1200px;margin:12px auto;display:grid;grid-template-columns:320px 1fr;gap:14px;padding:0 12px}
+  @media (max-width: 900px){
+    .layout{grid-template-columns:1fr}
+  }
+
+  /* 左侧项目列表 */
+  #listCard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px}
+  #filter{width:100%;margin-bottom:10px}
+  #itemList{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 260px);overflow:auto;padding-right:4px}
+  .row{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;cursor:pointer}
+  .row:hover{border-color:#cbd5e1}
+  .row.active{outline:2px solid var(--brand)}
+  .row .name{font-weight:600}
+  .row .meta{color:var(--muted);font-size:12px}
+  .row .tag{padding:2px 8px;border-radius:999px;background:var(--chip);font-size:12px;color:#4338ca}
+  .row .ops{display:flex;gap:6px}
+  .row button{padding:6px 10px;border-radius:8px}
+
+  /* 右侧时间轴 */
+  #rightCard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;overflow:hidden}
+  #gridWrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+  #gridHead{display:grid;position:sticky;top:0;background:#fafafa;border-bottom:1px solid var(--line);z-index:2}
+  #grid{display:grid}
+  .cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px}
+  .nowrap{white-space:nowrap}
+  .q{color:var(--muted);font-size:12px}
+
+  .chip{display:inline-block;padding:6px 12px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:600}
+  .chip.muted{background:#f1f5f9;color:#475569}
+  .chip.cancel{background:var(--cancel);color:#9a3412}
+  .chip.price{background:#ecfdf5;color:#065f46}
+  .chip.warn{background:#fef2f2;color:#991b1b}
+  .monthCol{min-height:56px;display:flex;flex-direction:column;gap:6px;align-items:start;justify-content:center}
+  .today{border-left:2px solid var(--brand)}
+
+  /* 小提示 */
+  .hint{color:var(--muted);font-size:12px;margin-top:8px}
+</style>
 </head>
 <body>
-<div class="container">
+
+<header>
   <div class="toolbar">
-    <div class="row" style="gap:10px">
-      <strong>费用 & 保修管理时间轴</strong>
-      <span class="muted">(单文件 / 无后端模式 + 可登录云端)</span>
-      <span id="modeBadge" class="pill">本地模式</span>
-    </div>
-    <div class="row">
-      <button id="btnLogin" class="btn">登录/注册</button>
-      <button id="btnLogout" class="btn hidden">退出</button>
-      <button id="btnAdd" class="btn primary">添加项目</button>
-    </div>
+    <div class="sp"><b>费用 & 保修管理时间轴</b>（单文件 / 无后端 + 可登录云端）</div>
+    <span id="who" class="badge">本地模式</span>
+    <button id="btnLogin" class="ghost">登录/注册</button>
+    <button id="btnLogout" class="ghost" style="display:none">退出</button>
+    <button id="btnAdd" class="primary">添加项目</button>
   </div>
+</header>
 
-  <div class="row" style="gap:12px;margin-bottom:12px">
-    <input id="filter" class="search" placeholder="搜索项目/类型/编号...">
-    <label class="pill">显示月数
-      <input id="months" type="number" value="72" style="width:72px;margin-left:8px;border:none;outline:none">
-    </label>
-    <button id="jumpToday" class="btn">跳到今天</button>
-  </div>
+<div class="layout">
+  <!-- ===== 左侧：项目列表 ===== -->
+  <section id="listCard">
+    <input id="filter" placeholder="搜索项目/类型/编号…" />
+    <div id="itemList"></div>
+  </section>
 
-  <div class="row">
-    <div class="left card leftList" id="leftRows" style="align-self:stretch"></div>
-    <div class="right" style="flex:1 1 auto">
-      <div id="gridWrap" class="card" style="position:relative">
-        <div id="todayLine" class="todayLine" style="display:none"></div>
-        <div id="gridHead"></div>
-        <div id="grid"></div>
+  <!-- ===== 右侧：时间轴（只显示当前选中的项目） ===== -->
+  <section id="rightCard">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <label>显示月数</label>
+      <input id="months" type="number" min="6" value="72" style="width:90px" />
+      <button id="btnToday" class="ghost">跳到今天</button>
+      <div class="sp"></div>
+      <span class="hint">提示：左侧点击项目切换；时间轴只显示当前选中项目。</span>
+    </div>
+
+    <div id="gridWrap">
+      <div id="gridHead"></div>
+      <div id="grid"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ 登录/注册对话框（简化，沿用你现有 /api） ============ -->
+<div id="dlg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:18px;min-width:320px;max-width:90%">
+    <div style="font-weight:700;margin-bottom:10px">登录 / 注册</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <input id="em" placeholder="邮箱" />
+      <input id="pw" placeholder="密码" type="password" />
+      <div id="msg" style="min-height:20px;color:#b91c1c;font-size:12px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="goClose" class="ghost">取消</button>
+        <button id="goReg" class="ghost">注册</button>
+        <button id="goLogin" class="primary">登录</button>
       </div>
-      <div class="hint small">提示：横向滚动查看未来月份；鼠标放在金额块可查看具体信息。（<b>退会期</b>显示在金额下方）。</div>
     </div>
   </div>
 </div>
 
-<dialog id="dlgAuth">
-  <form method="dialog" class="dlg-body">
-    <h3>登录 / 注册</h3>
-    <div class="form-row"><label>邮箱</label><input id="authEmail" type="email" placeholder="you@example.com"></div>
-    <div class="form-row"><label>密码</label><input id="authPass" type="password" placeholder="至少 8 位"></div>
-    <div id="authMsg" class="small" style="min-height:18px;color:#ef4444"></div>
-  </form>
-  <div class="dlg-foot">
-    <button id="authCancel" class="btn">取消</button>
-    <button id="authRegister" class="btn">注册</button>
-    <button id="authLogin" class="btn primary">登录</button>
-  </div>
-</dialog>
-
-<dialog id="dlgEdit">
-  <form method="dialog" class="dlg-body">
-    <h3 id="dlgTitle">新增项目</h3>
-    <div class="grid2">
-      <div class="form-row"><label>类型</label>
-        <select id="f_type">
-          <option value="plan">套餐</option>
-          <option value="warranty">保修</option>
-          <option value="insurance">保险</option>
-        </select>
-      </div>
-      <div class="form-row"><label>项目名称</label><input id="f_name"></div>
-      <div class="form-row"><label>编号</label><input id="f_number"></div>
-      <div class="form-row"><label>开始日期</label><input id="f_start" type="date"></div>
-      <div class="form-row"><label>备注</label><input id="f_notes"></div>
-      <div class="form-row" id="row_billday"><label>计费日</label><input id="f_bill" type="number" min="1" max="31" value="1"></div>
-      <div class="form-row" id="row_wm" style="display:none"><label>保修/保险期(月)</label><input id="f_wm" type="number" min="1" value="24"></div>
-    </div>
-    <div id="planBlock">
-      <div class="row" style="margin-top:10px;justify-content:space-between">
-        <strong>金额段</strong>
-        <div><button type="button" id="btnAddPhase" class="btn">加金额段</button><button type="button" id="btnAddCancel" class="btn">加退会期</button></div>
-      </div>
-      <div id="phaseList"></div>
-      <div id="cancelList"></div>
-    </div>
-  </form>
-  <div class="dlg-foot">
-    <button id="btnDelete" class="btn danger" style="margin-right:auto;display:none;border-color:#fecaca;color:#b91c1c;background:#fff">删除</button>
-    <button id="btnClose" class="btn">取消</button>
-    <button id="btnSave" class="btn primary">保存</button>
-  </div>
-</dialog>
-
 <script>
-const $ = (s, el=document)=>el.querySelector(s);
-const $$ = (s, el=document)=>Array.from(el.querySelectorAll(s));
-let items = []; let ONLINE=false; let editingId=null;
+/* ================== 简易工具 ================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const pad2 = n => (n<10?'0':'')+n;
+const startOfMonth = d => new Date(d.getFullYear(), d.getMonth(), 1);
+const addMonths = (d, k) => new Date(d.getFullYear(), d.getMonth()+k, 1);
 
-function load(){ try{return JSON.parse(localStorage.getItem('timeline_items')||'[]')}catch(e){return []} }
-function save(){ localStorage.setItem('timeline_items', JSON.stringify(items)); }
-async function api(path,opt={}){
-  const r = await fetch(path,{headers:{'content-type':'application/json'},credentials:'include',...opt});
+let ONLINE=false, items=[], selectedId = localStorage.getItem('lastSelectedId') || null;
+
+/* ============== 本地存储 ============== */
+const load=()=>JSON.parse(localStorage.getItem('items')||'[]');
+const save=()=>localStorage.setItem('items',JSON.stringify(items));
+
+/* ============== 云端 API（与你当前 /api 保持一致） ============== */
+async function api(url, opt={}){
+  const r = await fetch(url, {credentials:'include', headers:{'content-type':'application/json'}, ...opt});
   const data = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(data?.error||('请求失败 '+r.status));
+  if(!r.ok) throw new Error(data?.error || r.statusText);
   return data;
 }
 
-async function checkLogin(){
-  try{ const me = await api('/api/me'); ONLINE=true;
-    $('#modeBadge').textContent='云端'; $('#btnLogin').classList.add('hidden'); $('#btnLogout').classList.remove('hidden'); await cloudLoadItems();
-  }catch{ ONLINE=false; $('#modeBadge').textContent='本地模式'; $('#btnLogin').classList.remove('hidden'); $('#btnLogout').classList.add('hidden'); items = load(); render(); }
-}
-async function cloudLoadItems(){ if(!ONLINE) return;
-  const cloud = await api('/api/items'); const local = load(); const map = new Map();
-  cloud.forEach(it=>map.set(it.id,it)); local.forEach(it=>{if(!map.has(it.id)) map.set(it.id,it)}); items = Array.from(map.values()); save(); render(); }
-async function saveItemToBackend(it){ if(!ONLINE) return; await api('/api/items',{method:'POST',body:JSON.stringify(it)}); }
-async function deleteItemFromBackend(id){ if(!ONLINE) return; await api('/api/items?id='+encodeURIComponent(id),{method:'DELETE'}); }
-
-const head=$('#gridHead'),grid=$('#grid'),wrap=$('#gridWrap'),todayLine=$('#todayLine'),leftRows=$('#leftRows'); const COL_W=110;
-function startOfMonth(d){const x=new Date(d);x.setDate(1);x.setHours(0,0,0,0);return x}
-function addMonths(d,n){const x=new Date(d);x.setMonth(x.getMonth()+n);return x}
-function pad2(n){return String(n).padStart(2,'0')}
-function resolvePlanPrice(phases,idx){ if(!phases?.length) return null; let a=null; phases.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{if(idx>=p.fromMonth) a=p.amount}); return a }
-function isInCancel(wins,idx){ return wins?.some?.(w=>idx>=w.fromMonth && idx<=w.toMonth) }
-
-function render(){
-  const filter = ($('#filter').value||'').trim().toLowerCase();
-  const data = filter? items.filter(it=> (it.name+' '+it.type+' '+(it.number||'')).toLowerCase().includes(filter)) : items.slice();
-  const months = Number($('#months').value)||72; const today = new Date();
-  const minStart = data.length? data.map(it=>startOfMonth(new Date(it.startDate))).reduce((a,b)=>a<b?a:b) : startOfMonth(today);
-  const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i));
-  head.style.gridTemplateColumns = `repeat(${mlist.length}, ${COL_W}px)`;
-  head.innerHTML = mlist.map(m=>{ const q=Math.ceil((m.getMonth()+1)/3); return `<div class="cell nowrap" style="height:54px;text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class="small">Q${q}</div></div>` }).join('');
-  grid.style.gridTemplateColumns = `repeat(${mlist.length}, ${COL_W}px)`;
-  leftRows.innerHTML = data.map(it=>{
-    const tag = it.type==='plan'?'套餐':(it.type==='warranty'?'保修':'保险');
-    const extra = it.number?`　<span class="small muted">#${it.number}</span>`:'';
-    return `<div class="item" draggable="true" data-id="${it.id}"><span class="name" title="按住可拖拽">${it.name}</span><span class="tag">${tag}</span>${extra}<span class="meta">开始:${it.startDate}</span><div class="actions"><button class="btn ghost btn-edit" data-id="${it.id}">编辑</button></div></div>`;
-  }).join('');
-  $$('#leftRows .item').forEach(el=>{ el.addEventListener('dragstart',ev=>{el.classList.add('dragging');ev.dataTransfer.setData('text/plain',el.dataset.id)}); el.addEventListener('dragend',()=>el.classList.remove('dragging')); });
-  leftRows.addEventListener('dragover',e=>{ e.preventDefault(); const dragging=$('.item.dragging',leftRows); const after=Array.from(leftRows.querySelectorAll('.item:not(.dragging)')).find(r=> e.clientY<=r.getBoundingClientRect().top+r.offsetHeight/2); if(after) leftRows.insertBefore(dragging,after); else leftRows.appendChild(dragging); });
-  leftRows.addEventListener('drop',()=>{ const order=$$('#leftRows .item').map(x=>x.dataset.id); items.sort((a,b)=> order.indexOf(a.id)-order.indexOf(b.id)); save(); renderGridRows(data,mlist); });
-  $$('#leftRows .btn-edit').forEach(btn=> btn.onclick=()=> openEdit(btn.dataset.id));
-  renderGridRows(data,mlist);
-}
-function renderGridRows(data,mlist){
-  grid.innerHTML=''; const base=startOfMonth(mlist[0]); const monthsCount=mlist.length; const today=new Date();
-  data.forEach(it=>{
-    const start=startOfMonth(new Date(it.startDate));
-    const diffM=(start.getFullYear()-base.getFullYear())*12+(start.getMonth()-base.getMonth());
-    for(let j=0;j<monthsCount;j++){
-      const cell=document.createElement('div'); cell.className='cell';
-      const idx=j-diffM+1;
-      const price=it.type==='plan'? resolvePlanPrice(it.pricePhases||[], idx) : null;
-      const isCancel=it.type==='plan'? isInCancel(it.cancelWindows||[], idx) : false;
-      if(it.type!=='plan' && idx>=1 && idx <= (it.warrantyMonths||0)){
-        const div=document.createElement('div'); div.className='chip'; div.innerHTML='<div>'+ (it.type==='warranty'?'保修中':'保险中') +'</div>'; cell.appendChild(div);
-      }else if(price!=null && idx>=1){
-        const div=document.createElement('div'); div.className='chip'; div.innerHTML=`<div>¥ ${price.toLocaleString()}</div>` + (isCancel?`<div class="sub">退会期</div>`:''); cell.appendChild(div);
-      }
-      grid.appendChild(cell);
-    }
+/* ============== 价格/退会期计算 ============== */
+function resolvePlanPrice(phases, idx){
+  if(!phases?.length) return null;
+  let a=null;
+  // phases 内按 fromMonth 升序
+  phases.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{
+    if(idx>=p.fromMonth) a=p.amount;
   });
-  const t0=startOfMonth(mlist[0]); const t1=startOfMonth(mlist[mlist.length-1]);
-  if(today>=t0 && today<=new Date(t1.getFullYear(),t1.getMonth()+1,1)){ todayLine.style.display='block'; const monthsFromStart=(today.getFullYear()-t0.getFullYear())*12+(today.getMonth()-t0.getMonth()); todayLine.style.left=`calc(${monthsFromStart} * var(--cell-w) + var(--cell-w) / 2 - 1px)`; } else todayLine.style.display='none';
+  return a;
+}
+function isInCancel(wins, idx){
+  return wins?.some?.(w=> idx>=w.fromMonth && idx<=w.toMonth);
 }
 
-function syncTypeUI(){ const type=$('#f_type').value; $('#planBlock').style.display= type==='plan'? '':'none'; $('#row_billday').style.display= type==='plan'? '':'none'; $('#row_wm').style.display= type!=='plan'? '':'none'; }
-$('#f_type').addEventListener('change', syncTypeUI);
+/* ============== 列表 & 时间轴渲染 ============== */
+function renderList(){
+  const q = ($('#filter').value||'').trim().toLowerCase();
+  const data = q ? items.filter(it => (it.name+' '+it.type+' '+(it.number||'')).toLowerCase().includes(q)) : items;
+  const box = $('#itemList');
+  box.innerHTML = '';
 
-function addPhase(init){ const div=document.createElement('div'); div.className='phase'; div.innerHTML=`<div class="row" style="gap:8px;align-items:center;margin-top:6px"><span class="small">第</span><input class="m" type="number" min="1" value="${init?.fromMonth||1}" style="width:80px"><span class="small">个月起</span><input class="a" type="number" value="${init?.amount||0}" style="width:120px"><span class="small">日元/月</span><button class="btn ghost del" type="button">删除</button></div>`; div.querySelector('.del').onclick=()=>div.remove(); $('#phaseList').appendChild(div); }
-function addCancel(init){ const div=document.createElement('div'); div.className='cancel'; div.innerHTML=`<div class="row" style="gap:8px;align-items:center;margin-top:6px"><span class="small">第</span><input class="fm" type="number" min="1" value="${init?.fromMonth||1}" style="width:80px"><span class="small">-</span><input class="tm" type="number" min="1" value="${init?.toMonth||1}" style="width:80px"><span class="small">个月</span><button class="btn ghost del" type="button">删除</button></div>`; div.querySelector('.del').onclick=()=>div.remove(); $('#cancelList').appendChild(div); }
-$('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
+  data.forEach(it=>{
+    const div = document.createElement('div');
+    div.className = 'row'+(it.id===selectedId?' active':'');
+    div.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div class="name">
+          <span>${it.name}</span>
+          ${it.type==='plan'?`<span class="tag" style="margin-left:6px">套餐</span>`:''}
+          ${it.type==='warranty'?`<span class="tag" style="margin-left:6px">保修</span>`:''}
+          ${it.type==='insurance'?`<span class="tag" style="margin-left:6px">保险</span>`:''}
+        </div>
+        <div class="meta">#${it.number||'-'}　开始：${it.startDate||'-'}</div>
+      </div>
+      <div class="ops">
+        <button class="ghost" data-act="edit">编辑</button>
+        <button class="ghost" data-act="del">删除</button>
+      </div>
+    `;
+    div.onclick = (e)=>{
+      const act = e.target?.dataset?.act;
+      if(act==='edit'){ openEdit(it.id); e.stopPropagation(); return; }
+      if(act==='del'){ delItem(it.id); e.stopPropagation(); return; }
+      selectedId = it.id;
+      localStorage.setItem('lastSelectedId', selectedId);
+      render(); // 重新画右侧时间轴
+    };
+    box.appendChild(div);
+  });
 
-function readForm(){
-  const type=$('#f_type').value.trim(); const name=$('#f_name').value.trim(); const start=$('#f_start').value;
-  if(!name) return alert('请填写项目名称'); if(!start) return alert('请选择开始日期');
-  const base={ type, name, number:$('#f_number').value.trim(), startDate:start, notes:$('#f_notes').value.trim() };
-  if(type==='warranty' || type==='insurance') return { id:editingId||`it_${Date.now()}`, ...base, warrantyMonths:Number($('#f_wm').value)||0 };
-  const phases=[...$$('#phaseList .phase')].map(row=>({fromMonth:Number(row.querySelector('.m').value)||1, amount:Number(row.querySelector('.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth);
-  const cancels=[...$$('#cancelList .cancel')].map(row=>({fromMonth:Number(row.querySelector('.fm').value)||1, toMonth:Number(row.querySelector('.tm').value)||1}));
-  return { id:editingId||`it_${Date.now()}`, ...base, billingDay:Number($('#f_bill').value)||1, pricePhases:phases, cancelWindows:cancels };
+  // 若没有选中项，让第一个成为选中
+  if(!selectedId && data.length){ selectedId = data[0].id; localStorage.setItem('lastSelectedId', selectedId); }
 }
 
-const dlg=$('#dlgEdit');
+function renderTimeline(){
+  const cur = items.find(x=>x.id===selectedId);
+  const gridHead = $('#gridHead'), grid = $('#grid');
+  gridHead.innerHTML = ''; grid.innerHTML='';
+
+  if(!cur){
+    gridHead.style.gridTemplateColumns = '1fr';
+    gridHead.innerHTML = `<div class="cell">请选择左侧项目</div>`;
+    return;
+  }
+
+  const months = Number($('#months').value)||72;
+  const baseStart = startOfMonth(new Date(cur.startDate || new Date()));
+  const mlist = []; for(let i=0;i<months;i++) mlist.push(addMonths(baseStart,i));
+
+  const COL_W = 130;
+  gridHead.style.gridTemplateColumns = `repeat(${mlist.length}, ${COL_W}px)`;
+  gridHead.innerHTML = mlist.map(m=>{
+    const q = Math.ceil((m.getMonth()+1)/3);
+    const markToday = (new Date().getFullYear()===m.getFullYear() && new Date().getMonth()===m.getMonth());
+    return `<div class="cell nowrap ${markToday?'today':''}">
+      <div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div>
+      <div class="q">Q${q}</div>
+    </div>`;
+  }).join('');
+
+  grid.style.gridTemplateColumns = `repeat(${mlist.length}, ${COL_W}px)`;
+
+  // 仅渲染“当前项目”一行
+  const start = startOfMonth(new Date(cur.startDate));
+  const monthsFromStart = mlist.map(m=>{
+    // 计算第几个自然月（1 开始）
+    const diff = (m.getFullYear()-start.getFullYear())*12 + (m.getMonth()-start.getMonth()) + 1;
+    return diff; // 可能为 0/负数（开始前），也可以做禁用
+  });
+
+  const rowCells = monthsFromStart.map(idx=>{
+    let chips = [];
+    if(cur.type==='plan'){ // 套餐：显示金额 chip；退会期在下方
+      const price = idx>=1 ? resolvePlanPrice(cur.pricePhases||[], idx) : null;
+      if(price!=null){
+        chips.push(`<span class="chip price">￥${price.toLocaleString()}</span>`);
+      }
+      if(isInCancel(cur.cancelWindows||[], idx)){
+        chips.push(`<span class="chip cancel">退会期</span>`);
+      }
+    }else if(cur.type==='warranty'){
+      const wm = Number(cur.warrantyMonths||0);
+      if(idx>=1 && idx<=wm) chips.push(`<span class="chip">保修中</span>`);
+    }else if(cur.type==='insurance'){
+      const wm = Number(cur.warrantyMonths||0);
+      if(idx>=1 && idx<=wm) chips.push(`<span class="chip">保险中</span>`);
+    }else{
+      // 其它类型：占位
+      if(idx>=1) chips.push(`<span class="chip muted">有效</span>`);
+    }
+    return `<div class="cell monthCol">${chips.join('<div style="height:6px"></div>')}</div>`;
+  }).join('');
+
+  grid.innerHTML = rowCells;
+}
+
+/* ============== 整体渲染入口 ============== */
+function render(){ renderList(); renderTimeline(); }
+
+/* ============== 事件 ============== */
+$('#filter').addEventListener('input', render);
+$('#months').addEventListener('change', render);
+$('#btnToday').onclick = ()=>{
+  // 滚动到本月所在列
+  const monthCells = $$('#gridHead .cell');
+  const i = monthCells.findIndex(c=>c.classList.contains('today'));
+  if(i>=0){
+    const el = monthCells[i];
+    el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  }
+};
+
+/* ====== 示例：添加/编辑/删除（你可以换成自己的弹窗实现） ====== */
 function openEdit(id){
-  const it=items.find(x=>x.id===id); editingId=it?.id||null; $('#dlgTitle').textContent= it?'编辑项目':'新增项目';
-  $('#btnDelete').style.display= it?'':'none';
-  $('#f_type').value=it?.type||'plan'; $('#f_name').value=it?.name||''; $('#f_number').value=it?.number||''; $('#f_start').value=it?.startDate||''; $('#f_notes').value=it?.notes||''; $('#f_bill').value=it?.billingDay||1; $('#f_wm').value=it?.warrantyMonths||24; syncTypeUI();
-  $('#phaseList').innerHTML=''; (it?.pricePhases||[{fromMonth:1,amount:0}]).forEach(addPhase);
-  $('#cancelList').innerHTML=''; (it?.cancelWindows||[]).forEach(addCancel);
-  dlg.showModal();
+  const it = items.find(x=>x.id===id);
+  alert('这里接你的“编辑弹窗”逻辑（保持不变即可）。\n\n当前项：'+JSON.stringify(it,null,2));
 }
-$('#btnAdd').onclick=()=>openEdit(null); $('#btnClose').onclick=()=>dlg.close();
-$('#btnDelete').onclick=async ()=>{ if(!editingId) return; if(!confirm('确定删除该项目？')) return; const idx=items.findIndex(x=>x.id===editingId); if(idx>=0){ const del=items.splice(idx,1)[0]; save(); render(); await deleteItemFromBackend(del.id);} dlg.close(); };
-$('#btnSave').onclick=async ()=>{ const it=readForm(); if(!it) return; const idx=items.findIndex(x=>x.id===it.id); if(idx>=0) items[idx]=it; else items.push(it); save(); render(); dlg.close(); await saveItemToBackend(it); };
+function delItem(id){
+  if(!confirm('确定删除？')) return;
+  items = items.filter(x=>x.id!==id);
+  if(selectedId===id) selectedId=null;
+  save();
+  render();
+}
+$('#btnAdd').onclick = ()=>{
+  // 这里只演示新增一个“套餐”默认项；你可以调用你现有的“添加弹窗”
+  const id = 'it_'+Date.now();
+  const now = new Date();
+  const it = {
+    id, type:'plan', name:'新套餐', number:'', startDate: `${now.getFullYear()}-${pad2(now.getMonth()+1)}-01`,
+    billingDay:1, pricePhases:[{fromMonth:1,amount:1000}], cancelWindows:[]
+  };
+  items.push(it); save();
+  selectedId = id; localStorage.setItem('lastSelectedId', id);
+  render();
+};
 
-const dlgAuth=$('#dlgAuth');
-$('#btnLogin').onclick=()=>{ $('#authMsg').textContent=''; dlgAuth.showModal(); };
-$('#authCancel').onclick=()=>dlgAuth.close();
-async function doRegister(){ try{ $('#authRegister').disabled=true; $('#authLogin').disabled=true; $('#authMsg').style.color='#10b981'; $('#authMsg').textContent=''; const email=$('#authEmail').value.trim(), password=$('#authPass').value; await api('/api/register',{method:'POST',body:JSON.stringify({email,password})}); $('#authMsg').style.color='#10b981'; $('#authMsg').textContent='注册成功，请点击登录'; }catch(e){ $('#authMsg').style.color='#ef4444'; $('#authMsg').textContent=e.message||'注册失败'; }finally{ $('#authRegister').disabled=false; $('#authLogin').disabled=false; } }
-async function doLogin(){ try{ $('#authRegister').disabled=true; $('#authLogin').disabled=true; const email=$('#authEmail').value.trim(), password=$('#authPass').value; await api('/api/login',{method:'POST',body:JSON.stringify({email,password})}); dlgAuth.close(); await checkLogin(); }catch(e){ $('#authMsg').style.color='#ef4444'; $('#authMsg').textContent=e.message||'登录失败'; }finally{ $('#authRegister').disabled=false; $('#authLogin').disabled=false; } }
-$('#authRegister').onclick=doRegister; $('#authLogin').onclick=doLogin;
-$('#btnLogout').onclick=async ()=>{ try{ await api('/api/logout',{method:'POST'}) }catch{} await checkLogin(); };
+/* ============== 登录/注册（与你当前后端保持一致） ============== */
+async function checkLogin(){
+  try{
+    const me = await api('/api/me');
+    ONLINE=true;
+    $('#who').textContent='云端';
+    $('#btnLogin').style.display='none';
+    $('#btnLogout').style.display='inline-block';
+  }catch(e){
+    ONLINE=false;
+    $('#who').textContent='本地模式';
+    $('#btnLogin').style.display='inline-block';
+    $('#btnLogout').style.display='none';
+  }
+}
+$('#btnLogin').onclick = ()=>{ $('#dlg').style.display='flex' };
+$('#goClose').onclick = ()=>{ $('#dlg').style.display='none' };
+$('#goReg').onclick = async ()=>{
+  const btn = $('#goReg'); btn.disabled=true;
+  try{
+    $('#msg').textContent='';
+    await api('/api/register',{method:'POST', body: JSON.stringify({email:$('#em').value.trim(), password:$('#pw').value})});
+    $('#msg').textContent='注册成功，请点击登录';
+  }catch(e){ $('#msg').textContent=e.message }
+  finally{ btn.disabled=false }
+};
+$('#goLogin').onclick = async ()=>{
+  const btn = $('#goLogin'); btn.disabled=true;
+  try{
+    $('#msg').textContent='';
+    await api('/api/login',{method:'POST', body: JSON.stringify({email:$('#em').value.trim(), password:$('#pw').value})});
+    $('#dlg').style.display='none';
+    await checkLogin();
+  }catch(e){ $('#msg').textContent=e.message }
+  finally{ btn.disabled=false }
+};
+$('#btnLogout').onclick = async ()=>{
+  const btn = $('#btnLogout'); btn.disabled=true;
+  try{ await api('/api/logout',{method:'POST'}); await checkLogin(); }
+  finally{ btn.disabled=false }
+};
 
-$('#filter').addEventListener('input', render); $('#months').addEventListener('change', render);
-$('#jumpToday').onclick=()=>{ const today=new Date(); const headerCells=$$('#gridHead .cell'); if(!headerCells.length) return; const startText=headerCells[0].innerText.slice(0,7); const [y0,m0]=startText.split('-').map(Number); const idx=(today.getFullYear()-y0)*12 + (today.getMonth()+1 - m0); wrap.scrollTo({left: Math.max(0, idx*110 - wrap.clientWidth/2), behavior:'smooth'}); };
-
-items = load(); render(); checkLogin();
+/* ============== 启动：加载数据 & 首次渲染 ============== */
+(async function init(){
+  await checkLogin();
+  items = load();
+  // 没有本地数据时，给两条示例
+  if(!items.length){
+    items = [
+      {id:'aa', type:'plan', name:'乐天1', number:'07012345678', startDate:'2025-02-01', billingDay:1,
+        pricePhases:[{fromMonth:1,amount:1000},{fromMonth:25,amount:2000}], cancelWindows:[{fromMonth:25,toMonth:26}]
+      },
+      {id:'bb', type:'warranty', name:'冰箱', number:'', startDate:'2020-01-01', warrantyMonths:24}
+    ];
+    save();
+  }
+  render();
+})();
 </script>
 </body>
 </html>
