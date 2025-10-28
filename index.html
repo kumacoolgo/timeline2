@@ -125,4 +125,5 @@ $('#goLogin').onclick=async()=>{ const b=$('#goLogin'); b.disabled=true; try{ aw
 function bootstrap(){ items=load(); if(items.length===0){ items=[ {id:'demo1',type:'plan',name:'乐天1',number:'07012345678',startDate:'2025-02-01',billingDay:1,pricePhases:[{fromMonth:1,amount:1000}],cancelWindows:[{fromMonth:20,toMonth:22}]}, {id:'demo2',type:'warranty',name:'冰箱',number:'',startDate:'2020-01-01',warrantyMonths:24} ]; save(); } activeId=items[0]?.id||null; render(); }
 bootstrap();
 </script>
+
 </body></html>
