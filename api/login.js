@@ -1,19 +1,19 @@
-const { json, readBody, getUserByEmail, verifyPassword, createSession, checkRateLimit } = require('./_utils');
-
-function normalizeEmail(s=''){ return String(s).trim().toLowerCase(); }
-function normalizePassword(s=''){ return String(s).normalize('NFKC').replace(/^\s+|\s+$/gu, ''); }
+// api/login.js
+const { json, readBody, getUserByEmail, hashPassword, createSession } = require('./_utils');
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') return json(res, { error: 'Method Not Allowed' }, 405);
-  if (!await checkRateLimit(req)) return json(res, { error: '请求过于频繁' }, 429);
+  if(req.method!=='POST') return json(res,{error:'Method Not Allowed'},405);
   const body = await readBody(req);
-  const email = normalizeEmail(body?.email || '');
-  const rawPw = String(body?.password || '');
-  const normPw = normalizePassword(rawPw);
+  const email = String(body?.email||'').trim();
+  const password = String(body?.password||'');
+  if(!email || !password) return json(res,{error:'邮箱或密码错误'},400);
+
   const user = await getUserByEmail(email);
-  if (!user) return json(res, { error: '邮箱或密码错误', reason: 'user_not_found' }, 400);
-  const ok = verifyPassword(rawPw, user.hash) || verifyPassword(normPw, user.hash);
-  if (!ok) return json(res, { error: '邮箱或密码错误', reason:'bad_password' }, 400);
+  if(!user) return json(res,{error:'邮箱或密码错误', reason:'user_not_found'},400);
+
+  const h = hashPassword(password, user.salt);
+  if(h!==user.hash) return json(res,{error:'邮箱或密码错误'},400);
+
   await createSession(res, user.uid);
-  return json(res, { ok: true });
+  return json(res,{ok:true, uid:user.uid});
 };
