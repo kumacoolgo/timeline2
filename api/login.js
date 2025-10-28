@@ -1,13 +1,14 @@
-const { json, readBody, normEmail, getUserByEmail, verifyPassword, createSession } = require('./_utils');
-module.exports = async (req,res)=>{
-  if(req.method!=='POST') return json(res,{error:'Method Not Allowed'},405);
-  const body = await readBody(req);
-  const email = normEmail(body?.email||''); const pw=String(body?.password||'');
-  if(!email || !pw) return json(res,{error:'缺少参数'},400);
+const { json, readBody, getUserByEmail, verifyPassword, createSession } = require('./_utils');
+
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') return json(res, { error: 'Method Not Allowed' }, 405);
+  const { email, password } = await readBody(req);
+  if (!email || !password) return json(res, { error: '缺少邮箱或密码' }, 400);
+
   const user = await getUserByEmail(email);
-  if(!user) return json(res,{error:'邮箱或密码错误', reason:'user_not_found'},400);
-  const ok = verifyPassword(pw, user.hash);
-  if(!ok) return json(res,{error:'邮箱或密码错误', reason:'bad_password'},400);
+  if (!user || !verifyPassword(password, user.hash)) {
+    return json(res, { error: '邮箱或密码错误' }, 400);
+  }
   await createSession(res, user.uid);
-  return json(res,{ok:true});
+  json(res, { ok: true, uid: user.uid });
 };
