@@ -34,28 +34,11 @@ function setCookie(res, name, value, opt={}) {
   res.setHeader('set-cookie', a.join('; '));
 }
 
-// Upstash REST：body 必须是 JSON 数组，元素为字符串
+// 统一用 pipeline 执行单条/多条命令，避免 /<cmd> 形态在某些集群上报错
 async function redis(cmd, ...args) {
-  // 把所有参数都转成字符串，避免 "wrong number of arguments"
-  const body = args.map(v => typeof v === 'string' ? v : JSON.stringify(v));
-  const r = await fetch(`${UPSTASH_REDIS_REST_URL}/${String(cmd).toLowerCase()}`, {
-    method: 'POST',
-    headers: {
-      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d?.error || `Upstash ${cmd} failed`);
-  return d.result;
-}
+  // 把所有参数都转成字符串，避免意外多参数/类型问题
+  const body = [[ String(cmd).toLowerCase(), ...args.map(v => String(v)) ]];
 
-async function redisPipeline(commands) {
-  const body = commands.map(([c, ...rest]) => [
-    String(c).toLowerCase(),
-    ...rest.map(v => typeof v === 'string' ? v : JSON.stringify(v))
-  ]);
   const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
     method: 'POST',
     headers: {
@@ -64,6 +47,30 @@ async function redisPipeline(commands) {
     },
     body: JSON.stringify(body)
   });
+
+  const d = await r.json();
+  if (!r.ok) throw new Error(d?.error || 'Upstash pipeline(s) failed');
+
+  // 单条命令的结果在第 0 个
+  return d[0]?.result;
+}
+
+async function redisPipeline(commands) {
+  // commands 形如： [ ['set', key, value], ['get', key] ]
+  const body = commands.map(([c, ...rest]) => [
+    String(c).toLowerCase(),
+    ...rest.map(v => String(v))
+  ]);
+
+  const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
   const d = await r.json();
   if (!r.ok) throw new Error(d?.error || 'Upstash pipeline failed');
   return d.map(x => x.result);
