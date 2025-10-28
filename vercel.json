@@ -4,8 +4,8 @@
     "api/*.js": { "runtime": "nodejs22.x" }
   },
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },   // 先明确把 /api/* 交给函数
-    { "handle": "filesystem" },                  // 让已有的静态资源/函数按默认规则匹配
-    { "src": "/(.*)", "dest": "/index.html" }    // 最后兜底给单页应用
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
