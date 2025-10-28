@@ -39,14 +39,20 @@ function setCookie(res, name, value, opt = {}) {
 
 /** 兼容版：Upstash 官方推荐 GET 走 GET /get/<key>，避免某些 POST /get 不兼容 */
 async function redisGetCompat(key) {
-  const url = `${UPSTASH_REDIS_REST_URL}/get/${encodeURIComponent(key)}`;
-  const r = await fetch(url, {
-    method: 'GET',
-    headers: { authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}` }
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d?.error || 'Upstash GET failed');
-  return d.result ?? null; // 不存在时就是 null
+  try {
+    // 先走你当前 REST 设置默认的 POST /get
+    return await redis('get', key);
+  } catch (e) {
+    // 某些 Upstash 实例仅允许 GET /get/<key>
+    const u = `${UPSTASH_REDIS_REST_URL}/get/${encodeURIComponent(key)}`;
+    const r = await fetch(u, {
+      method: 'GET',
+      headers: { 'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}` }
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d?.error || 'Upstash GET failed');
+    return d.result;
+  }
 }
 
 /** 其余命令仍走 POST + JSON 数组（Upstash 文档标准用法） */
@@ -97,9 +103,8 @@ function verifyPassword(pw, stored) {
   return h2 === hex;
 }
 
-async function getUserByEmail(email) {
+async function getUserByEmail(email){
   const key = `user:email:${normEmail(email)}`;
-  // 关键：GET 改用兼容版
   const raw = await redisGetCompat(key);
   return raw ? JSON.parse(raw) : null;
 }
@@ -141,9 +146,10 @@ async function destroySession(req, res) {
 }
 
 module.exports = {
-  json, readBody, parseCookies, setCookie,
-  redis, redisPipeline, redisGetCompat,
+  json, readBody, parseCookies, setCookie, redis, redisPipeline,
   normEmail, uid, genSalt, hashPassword, verifyPassword,
   getUserByEmail, createUser, createSession, getUserIdBySession,
-  TTL: TTL_DAYS, destroySession
+  TTL: TTL_DAYS,
+  destroySession,
+  redisGetCompat
 };
