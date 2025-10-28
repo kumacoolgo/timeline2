@@ -6,11 +6,14 @@ module.exports = async (req, res) => {
 
   const body = await readBody(req);
   const email = (body?.email || '').trim();
-  const password = String(body?.password || '');
-  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRe.test(email) || password.length < 8) {
+  // 统一：注册时对密码 trim，防止把不可见空格写进库
+  const password = String(body?.password || '').trim();
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email) || password.length < 8) {
     return json(res, { error: '请提供有效邮箱与≥8位密码' }, 400);
   }
+
   const { error, user } = await createUser(email, password);
   if (error) return json(res, { error }, 400);
   return json(res, { ok: true, uid: user.uid });
