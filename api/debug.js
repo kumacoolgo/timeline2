@@ -1,33 +1,29 @@
-// api/debug.js  -- 只用于排查，验证完可以删
-const { json, normEmail, redis } = require('./_utils');
+// api/debug.js  —— 部署后可临时访问 /api/debug?email=xxx
+const {
+  json, normEmail, redisGetCompat
+} = require('./_utils');
 
 module.exports = async (req, res) => {
+  const email = normEmail(new URL(req.url, 'http://x').searchParams.get('email') || '');
+  const key = `user:email:${email}`;
+  let sample = null, exists = false, err = null;
+
   try {
-    const url = process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_REST_URL || '';
-    const email = normEmail(new URL(req.url, 'http://x').searchParams.get('email') || '');
-    let exists = null, sample = null;
-
-    if (email) {
-      const val = await redis('get', `user:email:${email}`);
-      exists = !!val;
-      if (val) {
-        const obj = JSON.parse(val);
-        sample = { uid: (obj.uid||'').slice(0,8), email: obj.email || null };
-      }
-    }
-
-    return json(res, {
-      env: {
-        dbUrlHash: url ? url.replace(/^https?:\/\//,'').slice(0, 24) + '…' : null,
-        hasUrl: !!url,
-        hasToken: !!(process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_REST_TOKEN),
-        vercelEnv: process.env.VERCEL_ENV || null
-      },
-      queryEmail: email || null,
-      exists,
-      sample
-    });
+    const raw = await redisGetCompat(key);
+    exists = !!raw;
+    if (raw) sample = JSON.parse(raw);
   } catch (e) {
-    return json(res, { error: e.message || String(e) }, 500);
+    err = e.message || String(e);
   }
+
+  json(res, {
+    env: {
+      hasUrl: !!process.env.UPSTASH_REDIS_REST_URL,
+      hasToken: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+      vercelEnv: process.env.VERCEL_ENV || 'unknown',
+      // 仅做 hash，避免暴露 URL
+      dbUrlHash: (process.env.UPSTASH_REDIS_REST_URL || '').replace(/^https?:\/\//, '').slice(0, 25) + '…'
+    },
+    queryEmail: email, key, exists, sample, err
+  });
 };
