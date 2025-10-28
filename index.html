@@ -14,12 +14,15 @@ input,select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;bac
 .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
 .btn.pri{background:#1f6fff;border-color:#1f6fff;color:#fff}
 .muted{color:var(--muted)} .chip{font-size:12px;background:#eef2ff;border:1px solid #dbeafe;padding:2px 8px;border-radius:999px}
-#gridWrap{position:relative;overflow:auto;height:calc(100vh - 190px);border-top:1px solid var(--line)}
+#gridWrap{position:relative;overflow:auto;height:calc(100vh - 210px);border-top:1px solid var(--line)}
 #gridHead{display:grid;position:sticky;top:0;background:var(--bg);z-index:3;border-bottom:1px solid var(--line)}
 #grid{display:grid}
 .cell{border-right:1px solid var(--line);padding:8px;text-align:center}
 .row{display:grid;align-items:center;border-bottom:1px solid var(--line);min-height:56px}
 .tag{font-size:12px;color:#155e75;background:#cffafe;border:1px solid #a5f3fc;padding:1px 6px;border-radius:6px}
+.tag.ins{color:#1e3a8a;background:#dbeafe;border-color:#bfdbfe}
+.tag.plan{color:#14532d;background:#dcfce7;border-color:#bbf7d0}
+.tag.warn{color:#7c2d12;background:#ffedd5;border-color:#fed7aa}
 .pill{display:inline-flex;gap:6px;align-items:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 8px;margin:4px 6px 0 0}
 .ghost{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
 dialog{border:0;border-radius:12px;padding:0;max-width:560px;width:calc(100vw - 24px)}
@@ -29,7 +32,14 @@ dialog{border:0;border-radius:12px;padding:0;max-width:560px;width:calc(100vw - 
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 12px;border-radius:8px;opacity:0;transition:.3s}
 .toast.show{opacity:1}
 .no-scroll{overflow:hidden}
-dialog[open]{z-index:9999}
+.drag-handle{cursor:grab;touch-action:none}
+.dragging{box-shadow:0 10px 20px rgba(0,0,0,.12);transform:scale(1.01);z-index:5}
+.placeholder{border:2px dashed #94a3b8;border-radius:10px;background:#f8fafc;}
+@media(max-width:640px){
+  .row2{grid-template-columns:1fr}
+  .pill{flex-direction:column;align-items:stretch}
+  .pill input{width:100%!important}
+}
 </style>
 </head>
 <body>
@@ -45,13 +55,19 @@ dialog[open]{z-index:9999}
   <div class="bar">
     <input id="filter" placeholder="搜索项目/类型/编号…" style="min-width:220px">
     <label>显示月数 <input id="months" type="number" value="72" style="width:90px"></label>
+    <label style="display:flex;align-items:center;gap:6px">
+      <input id="autoFit" type="checkbox"> 自动包含所有项目
+    </label>
+    <select id="jumpItem" style="min-width:200px">
+      <option value="">跳到项目…</option>
+    </select>
     <button class="btn" id="btnToday">跳到今天</button>
     <span style="flex:1"></span>
     <button class="btn pri" id="btnAdd">添加项目</button>
   </div>
 </header>
 
-<div style="padding:10px" class="subtle">提示：横向滚动查看未来月份；退回期会显示在金额的下方。</div>
+<div style="padding:10px" class="subtle">提示：横向滚动查看未来月份；<b>退会期</b>会显示在金额的下方。按住项目可以上下拖动排序。</div>
 
 <div id="gridWrap">
   <div id="gridHead"></div>
@@ -59,7 +75,6 @@ dialog[open]{z-index:9999}
   <div id="todayLine" style="position:absolute;top:0;bottom:0;width:2px;background:#2563eb;opacity:.6;display:none"></div>
 </div>
 
-<!-- 登录/注册 -->
 <dialog id="auth">
   <form method="dialog" class="dlg">
     <h3>登录 / 注册</h3>
@@ -74,13 +89,13 @@ dialog[open]{z-index:9999}
   </form>
 </dialog>
 
-<!-- 添加/编辑 -->
 <dialog id="editor">
   <form method="dialog" class="dlg" id="editForm">
     <h3 id="edTitle">添加项目</h3>
     <div class="row2"><label>类型</label>
       <select id="f_type">
         <option value="plan">套餐/收费</option>
+        <option value="insurance">保险</option>
         <option value="warranty">保修期</option>
       </select>
     </div>
@@ -93,8 +108,8 @@ dialog[open]{z-index:9999}
       <div class="row2"><label>扣费日</label><input id="f_bill" type="number" min="1" max="31" value="1" style="width:120px"></div>
       <div class="row2"><label>金额段</label><div id="phaseList"></div></div>
       <div style="margin-left:120px"><button class="ghost" type="button" id="btnAddPhase">加金额段</button></div>
-      <div class="row2"><label>退回期</label><div id="cancelList"></div></div>
-      <div style="margin-left:120px"><button class="ghost" type="button" id="btnAddCancel">加退回期</button></div>
+      <div class="row2"><label>退会期</label><div id="cancelList"></div></div>
+      <div style="margin-left:120px"><button class="ghost" type="button" id="btnAddCancel">加退会期</button></div>
     </div>
 
     <div id="secWarranty" style="display:none">
@@ -102,6 +117,7 @@ dialog[open]{z-index:9999}
     </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button type="button" class="btn warn" id="btnDelete" style="display:none;border-color:#fecaca;background:#fee2e2">删除</button>
       <button type="button" class="btn" id="edCancel">取消</button>
       <button type="button" class="btn pri" id="btnSave">保存</button>
     </div>
@@ -111,235 +127,103 @@ dialog[open]{z-index:9999}
 <div id="toast" class="toast">已保存</div>
 
 <script>
-/* ---------- Dialog 安全降级 ---------- */
 function openDlg(el){ if(!el) return; if(typeof el.showModal==='function'){ try{ el.showModal(); return; }catch(_){} } el.setAttribute('open',''); el.style.display='block'; document.body.classList.add('no-scroll'); }
 function closeDlg(el){ if(!el) return; if(typeof el.close==='function'){ try{ el.close(); }catch(_){} } el.removeAttribute('open'); el.style.display='none'; document.body.classList.remove('no-scroll'); }
-
-/* ---------- 工具 ---------- */
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 function pad2(n){return String(n).padStart(2,'0')}
 function startOfMonth(d){return new Date(d.getFullYear(),d.getMonth(),1)}
 function addMonths(d,n){const x=new Date(d);x.setMonth(x.getMonth()+n);return x}
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1200)}
-
-/* ---------- 配置 & 本地存储 ---------- */
-// const API_BASE = "https://你的域名"; // 如需跨域，填上你的域名；默认同域
-const API_BASE = '';
-async function api(url,opt){const r=await fetch((API_BASE||'')+url,opt);const t=await r.text();if(!r.ok)throw new Error(t||r.statusText);try{return JSON.parse(t)}catch{return t}}
-
+const API_BASE=''; async function api(url,opt){const r=await fetch((API_BASE||'')+url,opt);const t=await r.text();if(!r.ok)throw new Error(t||r.statusText);try{return JSON.parse(t)}catch{return t}}
 let items=[]; function saveLocal(){localStorage.setItem('items',JSON.stringify(items))} function loadLocal(){try{items=JSON.parse(localStorage.getItem('items')||'[]')}catch{items=[]}} loadLocal();
-
-/* ---------- 登录状态 ---------- */
 let ONLINE=false;
 async function checkLogin(){
-  try{
-    const me = await api('/api/me'); ONLINE=true;
-    $('#who').textContent = me.uid || '已登录';
-    $('#btnLogin').style.display='none'; $('#btnLogout').style.display='inline-block';
-    await cloudLoadItems();
-  }catch{
-    ONLINE=false; $('#who').textContent='本地模式';
-    $('#btnLogin').style.display='inline-block'; $('#btnLogout').style.display='none';
-    render();
-  }
+  try{ const me=await api('/api/me'); ONLINE=true; $('#who').textContent='云端'; $('#btnLogin').style.display='none'; $('#btnLogout').style.display='inline-block'; await cloudLoadItems(); }
+  catch{ ONLINE=false; $('#who').textContent='本地模式'; $('#btnLogin').style.display='inline-block'; $('#btnLogout').style.display='none'; render(); }
 }
-
 async function cloudLoadItems(){
   if(!ONLINE) return;
-  const cloud = await api('/api/items'); // hash 版 API：返回数组
-  const map = new Map(cloud.map(x=>[x.id,x]));
-  const localOnly = [];
-  for(const it of items){ if(!map.has(it.id)){ map.set(it.id,it); localOnly.push(it); } }
-  items = [...map.values()];
-  // 同步本地独有到云端（后台）
-  for(const it of localOnly){ api('/api/items',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(it)}).catch(console.warn) }
+  const cloud=await api('/api/items'); const map=new Map(cloud.map(x=>[x.id,x])); const localOnly=[];
+  for(const it of items){ if(!map.has(it.id)){ map.set(it.id,it); localOnly.push(it);} }
+  items=[...map.values()];
+  if(items.some(it=>typeof it.sort!=='number')){ items.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); items.forEach((it,i)=>{ if(typeof it.sort!=='number') it.sort=i; }); }
+  for(const it of localOnly){ api('/api/items',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(it)}).catch(console.warn); }
   saveLocal(); render();
 }
+$('#btnLogin').onclick=()=>openDlg($('#auth')); $('#authCancel').onclick=()=>closeDlg($('#auth'));
+$('#btnLogout').onclick=async()=>{ try{ await api('/api/logout',{method:'POST'});}catch(_){} checkLogin(); };
+$('#goLogin').onclick=async()=>{ const btn=$('#goLogin'),reg=$('#goReg'); btn.disabled=reg.disabled=true; $('#msg').textContent=''; try{ await api('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(),password:$('#pw').value})}); closeDlg($('#auth')); await checkLogin(); }catch(e){ $('#msg').textContent=e.message;} finally{ btn.disabled=reg.disabled=false; } };
+$('#goReg').onclick=async()=>{ const btn=$('#goReg'),log=$('#goLogin'); btn.disabled=log.disabled=true; $('#msg').textContent=''; try{ await api('/api/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(),password:$('#pw').value})}); $('#msg').textContent='注册成功，请点击登录'; }catch(e){ $('#msg').textContent=e.message;} finally{ btn.disabled=log.disabled=false; } };
 
-/* ---------- 登录/注册/退出 ---------- */
-$('#btnLogin').onclick = ()=> openDlg($('#auth'));
-$('#authCancel').onclick = ()=> closeDlg($('#auth'));
-$('#btnLogout').onclick = async ()=>{ try{ await api('/api/logout',{method:'POST'}); }catch(_){} checkLogin(); };
-
-$('#goLogin').onclick = async ()=>{
-  const btn=$('#goLogin'), reg=$('#goReg'); btn.disabled=reg.disabled=true; $('#msg').textContent='';
-  try{
-    await api('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(),password:$('#pw').value})});
-    closeDlg($('#auth')); await checkLogin();
-  }catch(e){ $('#msg').textContent=e.message; } finally{ btn.disabled=reg.disabled=false; }
-};
-$('#goReg').onclick = async ()=>{
-  const btn=$('#goReg'), log=$('#goLogin'); btn.disabled=log.disabled=true; $('#msg').textContent='';
-  try{
-    await api('/api/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(),password:$('#pw').value})});
-    $('#msg').textContent='注册成功，请点击登录';
-  }catch(e){ $('#msg').textContent=e.message; } finally{ btn.disabled=log.disabled=false; }
-};
-
-/* ---------- 添加/编辑 ---------- */
 let editingId=null;
-function syncTypeUI(){ const t=$('#f_type').value; $('#secPlan').style.display = (t==='plan')?'':'none'; $('#secWarranty').style.display = (t==='warranty')?'':'none'; }
-$('#f_type').onchange = syncTypeUI;
+function syncTypeUI(){ const t=$('#f_type').value; $('#secPlan').style.display=(t==='plan'||t==='insurance')?'':'none'; $('#secWarranty').style.display=(t==='warranty')?'':'none'; }
+$('#f_type').onchange=syncTypeUI;
+$('#btnAdd').onclick=()=>{ editingId=null; $('#edTitle').textContent='添加项目'; $('#btnDelete').style.display='none'; $('#f_type').value='plan'; $('#f_name').value=''; $('#f_number').value=''; $('#f_start').value=new Date().toISOString().slice(0,10); $('#f_notes').value=''; $('#f_bill').value=1; $('#f_wm').value=24; $('#phaseList').innerHTML=''; addPhase({fromMonth:1,amount:0}); $('#cancelList').innerHTML=''; syncTypeUI(); openDlg($('#editor')); };
+function addPhase(init){ const d=document.createElement('div'); d.className='pill'; d.innerHTML=`<span>第</span><input class="m" type="number" min="1" value="${init?.fromMonth||1}" style="width:90px"><span>个月起</span><input class="a" type="number" value="${init?.amount||0}" style="width:120px"><span>元/月</span><button class="ghost del" type="button">删除</button>`; d.querySelector('.del').onclick=()=>d.remove(); $('#phaseList').appendChild(d); }
+function addCancel(init){ const d=document.createElement('div'); d.className='pill'; d.innerHTML=`<span>第</span><input class="fm" type="number" min="1" value="${init?.fromMonth||1}" style="width:90px"><span>-</span><input class="tm" type="number" min="1" value="${init?.toMonth||1}" style="width:90px"><span>个月</span><button class="ghost del" type="button">删除</button>`; d.querySelector('.del').onclick=()=>d.remove(); $('#cancelList').appendChild(d); }
+$('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
+function readForm(){ const type=$('#f_type').value.trim(),name=$('#f_name').value.trim(),start=$('#f_start').value; if(!name) return alert('请填写名称'); if(!start) return alert('请选择开始日期'); const base={type,name,number:$('#f_number').value.trim(),startDate:start,notes:$('#f_notes').value.trim()}; if(type==='warranty') return {id:editingId||`it_${Date.now()}`,...base,warrantyMonths:Number($('#f_wm').value)||0,createdAt:Date.now(),sort:(items.length?Math.max(...items.map(x=>x.sort||0))+1:0)}; const phases=[...$$('#phaseList .pill')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1,amount:Number(r.querySelector('.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth); const cancels=[...$$('#cancelList .pill')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); return {id:editingId||`it_${Date.now()}`,...base,billingDay:Number($('#f_bill').value)||1,pricePhases:phases,cancelWindows:cancels,createdAt:Date.now(),sort:(items.length?Math.max(...items.map(x=>x.sort||0))+1:0)}; }
+$('#edCancel').onclick=()=>closeDlg($('#editor'));
+$('#btnSave').onclick=async()=>{ const it=readForm(); if(!it) return; const btn=$('#btnSave'); btn.disabled=true; const idx=items.findIndex(x=>x.id===it.id); if(idx>=0){ it.sort=(typeof items[idx].sort==='number'?items[idx].sort:idx); items[idx]=it; } else items.push(it); saveLocal(); try{ if(ONLINE) await api('/api/items',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(it)});}catch(e){console.warn(e);} finally{ btn.disabled=false; } closeDlg($('#editor')); toast('已保存'); render(); };
+$('#btnDelete').onclick=async()=>{ if(!editingId) return; if(!confirm('确定删除该项目？')) return; const id=editingId; const btn=$('#btnDelete'); btn.disabled=true; items=items.filter(x=>x.id!==id); saveLocal(); try{ if(ONLINE) await api('/api/items?id='+encodeURIComponent(id),{method:'DELETE'});}catch(e){console.warn(e);} finally{ btn.disabled=false; } closeDlg($('#editor')); toast('已删除'); render(); };
+function openEdit(it){ editingId=it.id; $('#edTitle').textContent='编辑项目'; $('#btnDelete').style.display='inline-block'; $('#f_type').value=it.type||'plan'; $('#f_name').value=it.name||''; $('#f_number').value=it.number||''; $('#f_start').value=it.startDate||new Date().toISOString().slice(0,10); $('#f_notes').value=it.notes||''; $('#f_bill').value=it.billingDay||1; $('#f_wm').value=it.warrantyMonths||24; $('#phaseList').innerHTML=''; (it.pricePhases||[]).forEach(p=>addPhase(p)); $('#cancelList').innerHTML=''; (it.cancelWindows||[]).forEach(c=>addCancel(c)); syncTypeUI(); openDlg($('#editor')); }
 
-$('#btnAdd').onclick = ()=>{
-  editingId=null; $('#edTitle').textContent='添加项目';
-  $('#f_type').value='plan'; $('#f_name').value=''; $('#f_number').value='';
-  $('#f_start').value=new Date().toISOString().slice(0,10);
-  $('#f_notes').value=''; $('#f_bill').value=1; $('#f_wm').value=24;
-  $('#phaseList').innerHTML=''; addPhase({fromMonth:1,amount:0});
-  $('#cancelList').innerHTML='';
-  syncTypeUI(); openDlg($('#editor'));
-};
-
-function addPhase(init){ const d=document.createElement('div'); d.className='pill';
-  d.innerHTML=`<span>第</span><input class="m" type="number" min="1" value="${init?.fromMonth||1}" style="width:70px">
-  <span>个月起</span><input class="a" type="number" value="${init?.amount||0}" style="width:100px">
-  <span>元/月</span><button class="ghost del" type="button">删除</button>`;
-  d.querySelector('.del').onclick=()=>d.remove(); $('#phaseList').appendChild(d);
-}
-function addCancel(init){ const d=document.createElement('div'); d.className='pill';
-  d.innerHTML=`<span>第</span><input class="fm" type="number" min="1" value="${init?.fromMonth||1}" style="width:70px">
-  <span>-</span><input class="tm" type="number" min="1" value="${init?.toMonth||1}" style="width:70px">
-  <span>个月</span><button class="ghost del" type="button">删除</button>`;
-  d.querySelector('.del').onclick=()=>d.remove(); $('#cancelList').appendChild(d);
-}
-$('#btnAddPhase').onclick=()=>addPhase();
-$('#btnAddCancel').onclick=()=>addCancel();
-
-function readForm(){
-  const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value;
-  if(!name) return alert('请填写名称'); if(!start) return alert('请选择开始日期');
-  const base={ type, name, number:$('#f_number').value.trim(), startDate:start, notes:$('#f_notes').value.trim() };
-  if(type==='warranty') return { id:editingId||`it_${Date.now()}`, ...base, warrantyMonths:Number($('#f_wm').value)||0, createdAt:Date.now() };
-  const phases=[...$$('#phaseList .pill')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1, amount:Number(r.querySelector('.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth);
-  const cancels=[...$$('#cancelList .pill')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1, toMonth:Number(r.querySelector('.tm').value)||1}));
-  return { id:editingId||`it_${Date.now()}`, ...base, billingDay:Number($('#f_bill').value)||1, pricePhases:phases, cancelWindows:cancels, createdAt:Date.now() };
-}
-
-$('#edCancel').onclick = ()=> closeDlg($('#editor'));
-$('#btnSave').onclick = async ()=>{
-  const it=readForm(); if(!it) return;
-  const idx=items.findIndex(x=>x.id===it.id); if(idx>=0) items[idx]=it; else items.push(it);
-  saveLocal(); closeDlg($('#editor'));
-  if(ONLINE) try{ await api('/api/items',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(it)}); }catch(e){ console.warn(e); }
-  toast('已保存'); render();
-};
-
-function openEdit(it){
-  editingId=it.id; $('#edTitle').textContent='编辑项目';
-  $('#f_type').value=it.type||'plan'; $('#f_name').value=it.name||''; $('#f_number').value=it.number||'';
-  $('#f_start').value=it.startDate||new Date().toISOString().slice(0,10); $('#f_notes').value=it.notes||'';
-  $('#f_bill').value=it.billingDay||1; $('#f_wm').value=it.warrantyMonths||24;
-  $('#phaseList').innerHTML=''; (it.pricePhases||[]).forEach(p=>addPhase(p));
-  $('#cancelList').innerHTML=''; (it.cancelWindows||[]).forEach(c=>addCancel(c));
-  syncTypeUI(); openDlg($('#editor'));
-}
-
-/* ---------- 时间轴渲染（修复重叠：左侧列 + 月份列） ---------- */
 const head=$('#gridHead'), grid=$('#grid'), wrap=$('#gridWrap'), todayLine=$('#todayLine');
 const COL_W=110, LEFT_W=260;
-
-function resolvePlanPrice(phases, idx){ if(!phases?.length) return null; let a=null; phases.slice().sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a; }
-function isInCancel(wins, idx){ return wins?.some?.(w=> idx>=w.fromMonth && idx<=w.toMonth); }
+function resolvePlanPrice(phases,idx){ if(!phases?.length) return null; let a=null; phases.slice().sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a; }
+function isInCancel(wins,idx){ return wins?.some?.(w=> idx>=w.fromMonth && idx<=w.toMonth); }
+function refreshJumpList(list){ const sel=$('#jumpItem'); const cur=sel.value; sel.innerHTML='<option value=\"\">跳到项目…</option>'+ list.map(it=>`<option value=\"${it.id}\">${it.name}（${it.startDate}）</option>`).join(''); if(([...list.map(x=>x.id), ''].includes(cur))) sel.value=cur; }
+$('#jumpItem').onchange=()=>{ const id=$('#jumpItem').value; if(!id) return; const it=items.find(x=>x.id===id); if(!it) return; const months=Math.max(1,Number($('#months').value)||72); const start=startOfMonth(new Date(it.startDate)); window.__forceMinStart=addMonths(start,-Math.floor(months/2)); render(); };
 
 function render(){
   const filter=($('#filter').value||'').trim().toLowerCase();
-  const data=filter?items.filter(it=>(it.name+' '+it.type+' '+(it.number||'')).toLowerCase().includes(filter)):items.slice();
-  const months=Math.max(1,Number($('#months').value)||72);
-  const today=new Date();
-  const minStart=data.length?data.map(it=>startOfMonth(new Date(it.startDate))).reduce((a,b)=>a<b?a:b):startOfMonth(today);
+  const data=(filter?items.filter(it=>(it.name+' '+it.type+' '+(it.number||'')).toLowerCase().includes(filter)):items.slice()).sort((a,b)=>(a.sort??0)-(b.sort??0)||(a.createdAt??0)-(b.createdAt??0));
+  const months=Math.max(1,Number($('#months').value)||72); const today=new Date();
+  let minStart = window.__forceMinStart ?? (data.length? data.map(it=>startOfMonth(new Date(it.startDate))).reduce((a,b)=>a<b?a:b) : startOfMonth(today)); window.__forceMinStart=null;
+  if($('#autoFit').checked && data.length){ const earliest=data.map(it=>startOfMonth(new Date(it.startDate))).reduce((a,b)=>a<b?a:b); const latest=data.map(it=>startOfMonth(new Date(it.startDate))).reduce((a,b)=>a>b?a:b); const cand=addMonths(latest,-(months-1)); minStart = cand < earliest ? earliest : cand; }
   const mlist=Array.from({length:months},(_,i)=>addMonths(minStart,i));
-
-  // 表头：左列 + 月份列
-  head.style.gridTemplateColumns = `${LEFT_W}px repeat(${mlist.length}, ${COL_W}px)`;
-  head.innerHTML = `<div class="cell"></div>` + mlist.map(m=>{
-    const q=Math.ceil((m.getMonth()+1)/3);
-    return `<div class="cell"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class="subtle">Q${q}</div></div>`;
-  }).join('');
-
+  head.style.gridTemplateColumns=`${LEFT_W}px repeat(${mlist.length}, ${COL_W}px)`;
+  head.innerHTML=`<div class="cell" style="text-align:left;padding-left:14px">项目</div>`+mlist.map(m=>{ const q=Math.ceil((m.getMonth()+1)/3); return `<div class="cell"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class="subtle">Q${q}</div></div>`}).join('');
+  refreshJumpList(items);
   grid.innerHTML='';
   for(const it of data){
-    const row=document.createElement('div');
-    row.className='row';
-    row.style.gridTemplateColumns = `${LEFT_W}px repeat(${mlist.length}, ${COL_W}px)`;
-
-    // 左侧信息列（固定第1列）
-    const info=document.createElement('div');
-    info.style.position='sticky'; info.style.left='0'; info.style.zIndex='2';
-    info.style.background='linear-gradient(90deg,#fff 70%,transparent)';
-    info.style.padding='6px 8px'; info.style.borderRight='1px solid var(--line)';
-    info.innerHTML = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <b>${it.name}</b>
-      <span class="tag">${it.type==='warranty'?'保修':'套餐'}</span>
-      ${it.number?`<span class="subtle">#${it.number}</span>`:''}
-      <span class="subtle">开始:${it.startDate}</span>
-      <button class="ghost" type="button">编辑</button>
-    </div>`;
-    info.querySelector('button').onclick=()=>openEdit(it);
-    row.appendChild(info);
-
-    // 月份单元格：从第2列起
-    for(let i=0;i<mlist.length;i++){
-      const idx=i+1;
-      const cell=document.createElement('div');
-      cell.className='cell'; cell.style.position='relative'; cell.style.gridColumn=String(i+2);
-
-      if(it.type==='plan'){
-        const price=resolvePlanPrice(it.pricePhases, idx);
-        if(price!=null){
-          const b=document.createElement('div');
-          b.style.cssText='position:absolute;left:8px;right:8px;top:6px;height:26px;display:flex;align-items:center;justify-content:center;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px';
-          b.textContent=`¥ ${price.toLocaleString()}`; b.title=`¥ ${price.toLocaleString()} / 月`;
-          cell.appendChild(b);
-
-          if(isInCancel(it.cancelWindows, idx)){
-            const tag=document.createElement('div');
-            tag.className='tag';
-            tag.style.cssText='position:absolute;left:50%;transform:translateX(-50%);bottom:6px';
-            tag.textContent='退回期';
-            cell.appendChild(tag);
-          }
-        }
-      }else{
-        const wm=Number(it.warrantyMonths||0);
-        const on = idx<=wm; // 从起始月连续 wm 个月
-        if(on){
-          const g=document.createElement('div');
-          g.className='tag';
-          g.style.cssText='position:absolute;left:50%;transform:translateX(-50%);top:10px';
-          g.textContent='保修中';
-          cell.appendChild(g);
-        }
-      }
-
+    const row=document.createElement('div'); row.className='row item-row'; row.dataset.id=it.id; row.style.gridTemplateColumns=`${LEFT_W}px repeat(${mlist.length}, ${COL_W}px)`;
+    const info=document.createElement('div'); info.className='drag-handle'; info.style.position='sticky'; info.style.left='0'; info.style.zIndex='2'; info.style.background='linear-gradient(90deg,#fff 70%,transparent)'; info.style.padding='8px 10px'; info.style.borderRight='1px solid var(--line)';
+    const badge= it.type==='warranty' ? '<span class="tag">保修</span>' : it.type==='insurance' ? '<span class="tag ins">保险</span>' : '<span class="tag plan">套餐</span>';
+    info.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${it.name||''}</b>${badge}</div><div class="subtle" style="margin-top:4px">${it.number?('#'+it.number):''}</div><div class="subtle" style="margin-top:2px">开始: ${it.startDate||''}</div></div><div><button class="ghost" type="button">编辑</button></div></div>`;
+    info.querySelector('button').onclick=()=>openEdit(it); row.appendChild(info);
+    for(let i=0;i<mlist.length;i++){ const idx=i+1; const cell=document.createElement('div'); cell.className='cell'; cell.style.position='relative'; cell.style.gridColumn=String(i+2);
+      if(it.type==='plan'||it.type==='insurance'){ const price=resolvePlanPrice(it.pricePhases,idx); if(price!=null){ const b=document.createElement('div'); b.style.cssText='position:absolute;left:8px;right:8px;top:6px;height:26px;display:flex;align-items:center;justify-content:center;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px'; b.textContent=`¥ ${price.toLocaleString()}`; b.title=`¥ ${price.toLocaleString()} / 月`; cell.appendChild(b);
+        if(isInCancel(it.cancelWindows,idx)){ const tag=document.createElement('div'); tag.className='tag'; tag.style.cssText='position:absolute;left:50%;transform:translateX(-50%);bottom:6px'; tag.textContent='退会期'; cell.appendChild(tag);} }
+      } else { const wm=Number(it.warrantyMonths||0); const on=idx<=wm; if(on){ const g=document.createElement('div'); g.className='tag'; g.style.cssText='position:absolute;left:50%;transform:translateX(-50%);top:10px'; g.textContent='保修中'; cell.appendChild(g);} }
       row.appendChild(cell);
     }
-
     grid.appendChild(row);
   }
-
-  // 今天线
-  const iToday = mlist.findIndex(m=> m.getFullYear()===today.getFullYear() && m.getMonth()===today.getMonth());
-  if(iToday>=0){
-    todayLine.style.display='block';
-    todayLine.style.left = `${LEFT_W + iToday*COL_W + COL_W/2}px`;
-  }else{
-    todayLine.style.display='none';
-  }
+  const iToday=mlist.findIndex(m=> m.getFullYear()===today.getFullYear() && m.getMonth()===today.getMonth());
+  if(iToday>=0){ todayLine.style.display='block'; todayLine.style.left=`${LEFT_W + iToday*COL_W + COL_W/2}px`; } else todayLine.style.display='none';
+  enableDragSort();
 }
-
-/* ---------- 交互 ---------- */
-$('#filter').oninput = render;
-$('#months').oninput = render;
-$('#btnToday').onclick = ()=>{
-  // 滚动到今天列居中
-  const left = parseFloat(todayLine.style.left||'0');
-  wrap.scrollLeft = Math.max(0, left - wrap.clientWidth/2);
-};
-
-/* ---------- 启动 ---------- */
-checkLogin();
-render();
+function enableDragSort(){
+  const rows=[...$$('.item-row')]; let pressTimer=null,dragging=null,startY=0,placeholder=null;
+  function onPointerDown(e){ const handle=e.currentTarget; const row=handle.parentElement; startY=(e.touches?e.touches[0].clientY:e.clientY); pressTimer=setTimeout(()=>beginDrag(row,startY),300); document.addEventListener('pointermove', onMovePassive,{passive:true}); document.addEventListener('pointerup', cancelPress,{once:true}); document.addEventListener('touchmove',onMovePassive,{passive:true}); document.addEventListener('touchend',cancelPress,{once:true}); }
+  function onMovePassive(ev){ const y=(ev.touches?ev.touches[0].clientY:ev.clientY); if(Math.abs(y-startY)>6 && pressTimer){ clearTimeout(pressTimer); pressTimer=null; } }
+  function cancelPress(){ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } document.removeEventListener('pointermove', onMovePassive); document.removeEventListener('touchmove', onMovePassive); }
+  function beginDrag(row,y0){ dragging=row; dragging.classList.add('dragging'); const rect=row.getBoundingClientRect(); row.style.position='relative'; row.style.zIndex='6';
+    placeholder=document.createElement('div'); placeholder.className='row placeholder'; placeholder.style.height=rect.height+'px'; placeholder.style.gridTemplateColumns=row.style.gridTemplateColumns; row.parentElement.insertBefore(placeholder,row.nextSibling);
+    function onMove(e){ const y=(e.touches?e.touches[0].clientY:e.clientY); const dy=y-y0; dragging.style.transform=`translateY(${dy}px)`; const list=[...$$('.item-row')].filter(r=>r!==dragging); const mid=y+window.scrollY; let targetIndex=0; for(let i=0;i<list.length;i++){ const r=list[i].getBoundingClientRect(); const center=r.top+window.scrollY + r.height/2; if(mid>center) targetIndex=i+1; } const parent=dragging.parentElement; if(targetIndex>=parent.children.length) targetIndex=parent.children.length-1; parent.insertBefore(placeholder,parent.children[targetIndex]); }
+    function onUp(){ document.removeEventListener('pointermove',onMove); document.removeEventListener('pointerup',onUp); document.removeEventListener('touchmove',onMove); document.removeEventListener('touchend',onUp);
+      placeholder.parentElement.insertBefore(dragging,placeholder); dragging.style.transform=''; dragging.style.position=''; dragging.style.zIndex=''; dragging.classList.remove('dragging'); placeholder.remove(); placeholder=null;
+      const order=[...$$('.item-row')].map(r=>r.dataset.id); const map=new Map(items.map(x=>[x.id,x])); order.forEach((id,i)=>{ if(map.has(id)) map.get(id).sort=i; }); items=order.map(id=>map.get(id)); saveLocal();
+      if(ONLINE){ const ups=items.map(it=> api('/api/items',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...it})}).catch(console.warn) ); Promise.allSettled(ups); }
+    }
+    document.addEventListener('pointermove',onMove); document.addEventListener('pointerup',onUp,{once:true}); document.addEventListener('touchmove',onMove,{passive:false}); document.addEventListener('touchend',onUp,{once:true});
+  }
+  rows.forEach(row=>{ const handle=row.querySelector('.drag-handle'); handle.addEventListener('pointerdown', onPointerDown); handle.addEventListener('touchstart', onPointerDown,{passive:true}); });
+}
+$('#filter').oninput=render; $('#months').oninput=render; $('#autoFit').onchange=render;
+$('#btnToday').onclick=()=>{ const left=parseFloat(todayLine.style.left||'0'); wrap.scrollLeft=Math.max(0,left - wrap.clientWidth/2); };
+checkLogin(); render();
 </script>
 </body>
 </html>

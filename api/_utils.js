@@ -1,64 +1,104 @@
-// Upstash + Session + PBKDF2
 const crypto = require('crypto');
 
-const TTL_DAYS = parseInt(process.env.SESSION_TTL_DAYS || '30', 10);
-const TTL = TTL_DAYS * 24 * 60 * 60;
+const {
+  UPSTASH_REDIS_REST_URL = '',
+  UPSTASH_REDIS_REST_TOKEN = '',
+  SESSION_TTL_SECONDS = '1209600',
+} = process.env;
 
-const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = process.env;
+const TTL = parseInt(SESSION_TTL_SECONDS, 10) || 1209600;
 
-function json(res, obj, status = 200) {
-  res.statusCode = status;
-  res.setHeader('content-type', 'application/json');
-  res.end(JSON.stringify(obj));
-}
-
-function parseCookies(req) {
-  const h = req.headers['cookie'] || '';
-  const out = {};
-  h.split(/;\s*/).forEach(p => { const i = p.indexOf('='); if (i > 0) out[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1)); });
-  return out;
-}
-
-function setCookie(res, name, value, { maxAge = TTL } = {}) {
-  const attrs = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
-  if (process.env.VERCEL_URL) attrs.push('Secure');
-  if (maxAge) attrs.push(`Max-Age=${maxAge}`);
-  res.setHeader('Set-Cookie', attrs.join('; '));
-}
-
-async function readBody(req) {
-  return await new Promise(resolve => {
-    let raw = '';
-    req.on('data', c => raw += c);
-    req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { resolve({}); } });
-  });
-}
-
-// Upstash（用 pipeline 包一条命令）
 async function redis(cmd, ...args) {
+  const r = await fetch(`${UPSTASH_REDIS_REST_URL}/${cmd.toLowerCase()}`, {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(args)
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.error || `Upstash ${cmd} failed`);
+  return data.result;
+}
+
+async function redisPipeline(commands) {
   const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
     method: 'POST',
     headers: {
       'authorization': `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
       'content-type': 'application/json'
     },
-    body: JSON.stringify([[cmd, ...args]])
+    body: JSON.stringify(commands)
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data?.error || `Upstash ${cmd} failed`);
-  return data[0].result;
+  const data = await r.json().catch(() => []);
+  if (!r.ok) throw new Error(data?.error || `Upstash pipeline failed`);
+  return data.map(x => x.result);
 }
 
-// 用户 & 会话
-function normEmail(email) { return String(email || '').trim().toLowerCase(); }
-function uid() { return crypto.randomUUID().replace(/-/g, ''); }
-function genSalt() { return crypto.randomBytes(16).toString('base64'); }
-function hashPassword(password, saltB64) {
-  const salt = Buffer.from(saltB64, 'base64');
-  const hash = crypto.pbkdf2Sync(String(password), salt, 310000, 32, 'sha256').toString('base64');
-  return hash;
+function json(res, data, status = 200) {
+  res.statusCode = status;
+  res.setHeader('content-type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(data));
 }
 
+function parseCookies(req) {
+  const hdr = req.headers.cookie || '';
+  const out = {};
+  hdr.split(';').forEach(p => {
+    const i = p.indexOf('=');
+    if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+  });
+  return out;
+}
+
+function setCookie(res, name, val, opt = {}) {
+  const parts = [`${name}=${encodeURIComponent(val)}`];
+  if (opt.httpOnly !== false) parts.push('HttpOnly');
+  parts.push('Path=/');
+  parts.push('SameSite=Lax');
+  if (opt.maxAge) parts.push(`Max-Age=${opt.maxAge}`);
+  if (opt.secure !== false) parts.push('Secure');
+  res.setHeader('set-cookie', parts.join('; '));
+}
+
+async function readBody(req) {
+  const bufs = [];
+  for await (const ch of req) bufs.push(ch);
+  const s = Buffer.concat(bufs).toString('utf8') || '{}';
+  try { return JSON.parse(s); } catch { return {}; }
+}
+
+function normEmail(e=''){ return String(e).trim().toLowerCase(); }
+function uid(){ return crypto.randomUUID?.() || ('u_' + Date.now().toString(36)+Math.random().toString(36).slice(2,8)); }
+function genSalt(n=16){ return crypto.randomBytes(n).toString('hex'); }
+function hashPassword(pw, salt){
+  const iters = 210000;
+  const key = crypto.pbkdf2Sync(String(pw), String(salt), iters, 32, 'sha256');
+  return `pbkdf2$${iters}$${salt}$${key.toString('hex')}`;
+}
+function verifyPassword(pw, hash){
+  const [algo, itersStr, salt, digest] = String(hash).split('$');
+  if (algo!=='pbkdf2') return false;
+  const iters = parseInt(itersStr,10)||210000;
+  const key = crypto.pbkdf2Sync(String(pw), String(salt), iters, 32, 'sha256').toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(key,'hex'), Buffer.from(digest,'hex'));
+}
+
+async function checkRateLimit(req) {
+  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+  const k = `rl:${ip}`;
+  try{
+    const [cnt] = await redisPipeline([['INCR', k], ['EXPIRE', k, 60]]);
+    return (cnt <= 30);
+  }catch{ return true; }
+}
+
+async function getUserByEmail(email) {
+  const key = `user:email:${normEmail(email)}`;
+  const s = await redis('GET', key);
+  return s ? JSON.parse(s) : null;
+}
 async function createUser(email, password) {
   email = normEmail(email);
   const key = `user:email:${email}`;
@@ -67,32 +107,32 @@ async function createUser(email, password) {
   const salt = genSalt();
   const hash = hashPassword(password, salt);
   const user = { uid: uid(), email, salt, hash, createdAt: Date.now() };
-  await redis('SET', key, JSON.stringify(user));
+  await redisPipeline([
+    ['SET', key, JSON.stringify(user)],
+    ['SET', `user:uid:${user.uid}`, user.email]
+  ]);
   return { user };
 }
-
-async function getUserByEmail(email) {
-  email = normEmail(email);
-  const raw = await redis('GET', `user:email:${email}`);
-  return raw ? JSON.parse(raw) : null;
+async function createSession(res, uid) {
+  const sid = 's_' + crypto.randomBytes(18).toString('hex');
+  await redisPipeline([['SET', `sid:${sid}`, uid], ['EXPIRE', `sid:${sid}`, TTL]]);
+  setCookie(res, 'sid', sid, { maxAge: TTL });
 }
-
-async function createSession(userId) {
-  const sid = uid();
-  await redis('SETEX', `sess:${sid}`, TTL, userId);
-  return sid;
+async function destroySession(req, res) {
+  const sid = parseCookies(req).sid;
+  if (sid) await redis('DEL', `sid:${sid}`);
+  setCookie(res, 'sid', '', { maxAge: 0 });
 }
-async function destroySession(sid) { await redis('DEL', `sess:${sid}`); }
 async function getUserIdBySession(req) {
-  const c = parseCookies(req); const raw = c['sid']; if (!raw) return null;
-  const uid = await redis('GET', `sess:${raw}`);
+  const sid = parseCookies(req).sid;
+  if (!sid) return null;
+  const uid = await redis('GET', `sid:${sid}`);
   return uid || null;
 }
 
 module.exports = {
-  json, parseCookies, setCookie, readBody, redis,
-  normEmail, uid, genSalt, hashPassword,
-  createUser, getUserByEmail,
-  createSession, destroySession, getUserIdBySession,
-  TTL
+  json, readBody, parseCookies, setCookie, redis, redisPipeline,
+  normEmail, uid, genSalt, hashPassword, verifyPassword,
+  createUser, getUserByEmail, createSession, destroySession, getUserIdBySession,
+  TTL, checkRateLimit
 };
