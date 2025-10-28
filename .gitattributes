@@ -1,5 +1,2 @@
 # 默认所有文本文件用 LF
 * text=auto eol=lf
-
-# 如需某些Windows脚本保留 CRLF，再单独指定
-# *.bat eol=crlf
