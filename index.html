@@ -29,7 +29,7 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .item-line-1 { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .item-line-1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .item-line-1 .item-number { margin-left: auto; flex-shrink: 0; font-size: 12px; color: var(--muted); }
-.item-line-2 { font-size: 12px; color: var(--muted; margin-top: 2px; }
+.item-line-2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
 .cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px}
 .nowrap{white-space:nowrap}
@@ -207,16 +207,33 @@ function render(){
     return `<div class="cell nowrap" data-ym="${ym}" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`
   }).join(''); 
   
-  grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; const it=data[0]; const m0=startOfMonth(new Date(it.startDate)); const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m_getMonth() + 1; const cells=[]; for(let i=0;i<mlist.length;i++){ const idx=MonthIndex(mlist[i]); if(it.type==='warranty'){ const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); cells.push(`<div class=cell style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); }else{ const amount=resolvePlanPrice(it.pricePhases,idx); const cancel=isInCancel(it.cancelWindows,idx); cells.push(`<div class=cell style="text-align:center">${cancel?'<div class="badge cancel">退会期</div>':''}${amount!=null?`<div class=badge>￥ ${amount.toLocaleString()}</div>`:''}</div>`); } } grid.innerHTML=cells.join(''); 
+  grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
+  const it=data[0]; 
+  const m0=startOfMonth(new Date(it.startDate)); 
+  
+  // 【修改】修复拼写错误 m_getMonth -> m0.getMonth
+  const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
+  
+  const cells=[]; 
+  for(let i=0;i<mlist.length;i++){ 
+    const idx=MonthIndex(mlist[i]); 
+    if(it.type==='warranty'){ 
+      const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); 
+      cells.push(`<div class=cell style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); 
+    }else{ 
+      const amount=resolvePlanPrice(it.pricePhases,idx); 
+      const cancel=isInCancel(it.cancelWindows,idx); 
+      cells.push(`<div class=cell style="text-align:center">${cancel?'<div class="badge cancel">退会期</div>':''}${amount!=null?`<div class=badge>￥ ${amount.toLocaleString()}</div>`:''}</div>`); 
+    } 
+  } 
+  grid.innerHTML=cells.join(''); 
 
   // --- 4. 初始化拖拽排序 ---
   sortableList = new Sortable(L, {
     animation: 150,
     handle: '.item', 
-    // 【修改】添加长按延迟
-    delay: 500, // 延迟 500ms (半秒)
-    delayOnTouchOnly: true, // 仅在触摸设备上启用延迟
-    // --- 修改结束 ---
+    delay: 500, // 延迟 500ms
+    delayOnTouchOnly: true, // 仅在触摸设备上启用
     onEnd: async (evt) => { 
       const movedItem = items[evt.oldIndex]; 
       const masterIndex = allCloudItems.findIndex(it => it.id === movedItem.id);
