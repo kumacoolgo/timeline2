@@ -1,4 +1,4 @@
-// api/items.js - Hash 存储
+// api/items.js - Hash 存储 (已修改)
 const { json, readBody, getUserIdBySession, redis } = require('./_utils');
 
 module.exports = async (req, res) => {
@@ -9,11 +9,19 @@ module.exports = async (req, res) => {
   if(req.method==='GET'){
     const obj = await redis('hgetall', key) || {};
     const arr = Object.values(obj).map(v=>JSON.parse(v));
+    
+    // 【修改】按 order 字段排序
+    arr.sort((a, b) => (a.order || 0) - (b.order || 0));
+    
     return json(res, arr);
   }
   if(req.method==='POST'){
     const it = await readBody(req);
     it.id = it.id || ('it_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8));
+    
+    // 【修改】添加默认的 order 字段
+    it.order = it.order || Date.now(); 
+    
     await redis('hset', key, it.id, JSON.stringify(it));
     return json(res, it);
   }
@@ -25,7 +33,9 @@ module.exports = async (req, res) => {
     if(!oldRaw) return json(res,{error:'Not Found'},404);
     const old = JSON.parse(oldRaw);
     const body = await readBody(req);
-    const fresh = { ...old, ...body, id };
+    // 【注】这里的合并逻辑 { ...old, ...body, id } 非常好
+    // 它允许我们只发送 { "order": ... } 来更新排序
+    const fresh = { ...old, ...body, id }; 
     await redis('hset', key, id, JSON.stringify(fresh));
     return json(res,{ok:true});
   }
