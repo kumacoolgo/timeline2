@@ -60,6 +60,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     <div class="row">
       <input id="filter" placeholder="搜索项目/类型/编号..." style="flex: 1; min-width: 0;"/>
       <button id="btnSearch" class="ghost">搜索</button>
+      <button id="btnClearSearch" class="ghost">清空</button>
     </div>
     <div class="row">
       <label class="small">月数</label>
@@ -210,10 +211,7 @@ function render(){
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   const it=data[0]; 
   const m0=startOfMonth(new Date(it.startDate)); 
-  
-  // 【修改】修复拼写错误 m_getMonth -> m0.getMonth
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
-  
   const cells=[]; 
   for(let i=0;i<mlist.length;i++){ 
     const idx=MonthIndex(mlist[i]); 
@@ -232,8 +230,8 @@ function render(){
   sortableList = new Sortable(L, {
     animation: 150,
     handle: '.item', 
-    delay: 500, // 延迟 500ms
-    delayOnTouchOnly: true, // 仅在触摸设备上启用
+    delay: 500,
+    delayOnTouchOnly: true,
     onEnd: async (evt) => { 
       const movedItem = items[evt.oldIndex]; 
       const masterIndex = allCloudItems.findIndex(it => it.id === movedItem.id);
@@ -316,6 +314,12 @@ $('#btnRenderMonths').onclick = () => render();
 $('#btnSearch').onclick = () => render();
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
+// 【新增】"清空" 按钮事件
+$('#btnClearSearch').onclick = () => {
+  $('#filter').value = ''; // 清空输入框
+  render(); // 重新渲染
+};
+
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
@@ -353,7 +357,7 @@ $('#goLogin').onclick = async ()=>{
   try{
     await api('/api/login',{
       method:'POST',
-      headers:{'content-type':'application/json'},
+      headers:{'content-type': 'application/json'},
       body: JSON.stringify({ email: $('#em').value.trim(), password: $('#pw').value })
     });
     const me = await api('/api/me'); 
