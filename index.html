@@ -19,11 +19,38 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .header .left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--pill);border:1px solid var(--line)}
 #layout{display:grid;grid-template-columns: 340px 1fr; gap:14px; align-items:start}
-/* 【修改】为拖拽添加样式 */
 #leftWrap{max-height: calc(var(--row-h) * 10 + 8px);overflow-y:auto;padding-right:6px}
 .item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;height:var(--row-h);gap:8px;margin-bottom:8px;cursor:grab}
 .item:active { cursor: grabbing; }
-.item.active{outline:2px solid var(--brand)} .item .title{font-weight:600} .item .meta{font-size:12px;color:var(--muted)}
+.item.active{outline:2px solid var(--brand)} 
+/* 【修改】移除旧的 .item .title 和 .meta，替换为新布局样式 */
+/* .item .title{font-weight:600} .item .meta{font-size:12px;color:var(--muted)} */
+
+.item-line-1 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600; /* 应用旧 .title 样式 */
+}
+.item-line-1 > span:first-child { /* 标题名称 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.item-line-1 .item-number {
+  margin-left: auto; /* 推动编号到最右侧 */
+  flex-shrink: 0;
+  font-size: 12px; /* 应用旧 .meta 样式 */
+  color: var(--muted);
+}
+.item-line-2 {
+  font-size: 12px; /* 应用旧 .meta 样式 */
+  color: var(--muted);
+  margin-top: 2px;
+}
+/* --- 布局修改结束 --- */
+
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
 .cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px}
 .nowrap{white-space:nowrap}
@@ -35,9 +62,20 @@ fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top
 fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:8px;align-items:center;margin:6px 0}
 .row-fields input{width:120px} .row-fields .m{width:80px} .row-fields .a{width:120px}
 @media (max-width: 860px){
+  /* 【修改】解决移动端头部溢出问题 */
+  .header {
+    flex-direction: column; /* 垂直堆叠 */
+    align-items: stretch; /* 占满全宽 */
+    gap: 10px;
+  }
+  .header .row {
+    justify-content: flex-end; /* 按钮靠右 */
+  }
+  /* --- 修改结束 --- */
+
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
-  #leftWrap { max-height: 25vh; } /* 移动端列表高度 */
+  #leftWrap { max-height: 25vh; }
 }
 </style>
 </head>
@@ -108,10 +146,8 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 <script>
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const COL_W=110; let items=[], activeId=null, editingId=null, ONLINE=false;
-let sortableList = null; // 用于 SortableJS 实例
+let sortableList = null;
 function pad2(n){return (n<10?'0':'')+n;} function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
-
-// 【移除】save() 和 load() 函数 (localStorage)
 
 function syncTypeUI(){ const t=$('#f_type').value; $('#blockPlan').style.display=(t==='plan'||t==='insurance')?'block':'none'; $('#blockWarranty').style.display=(t==='warranty')?'block':'none'; }
 function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type=number min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type=number value="${i?.amount||0}"><span class=small>日元/月</span><button class="ghost del" type=button>删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
@@ -123,28 +159,47 @@ function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.s
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 function render(){ 
   const L=$('#leftWrap');
-  // 【修改】如果存在 Sortable 实例，先销毁
   if(sortableList) {
     sortableList.destroy();
     sortableList = null;
   }
   
-  L.innerHTML = items.map(it=>`<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}"><div><div class=title>${it.name} ${it.type==='plan'?'<span class=small style=color:#6b5cff>套餐</span>':it.type==='insurance'?'<span class=small style=color:#10b981>保险</span>':'<span class=small style=color:#3b82f6>保修</span>'}</div><div class=meta>#${it.number||'-'}　开始: ${it.startDate||'-'}</div></div><div class=ops><button class="ghost btnEdit" data-id="${it.id}" type=button>编辑</button><button class="ghost btnDel" data-id="${it.id}" type=button>删除</button></div></div>`).join(''); 
+  // 【修改】L.innerHTML 的内容，以支持新的两行布局
+  L.innerHTML = items.map(it => {
+    const typeLabel = it.type === 'plan' ? '<span class="small" style="color:#6b5cff">套餐</span>' :
+                    it.type === 'insurance' ? '<span class="small" style="color:#10b981">保险</span>' :
+                    '<span class="small" style="color:#3b82f6">保修</span>';
+    
+    return `<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}">
+      <div>
+        <div class="title item-line-1">
+          <span>${it.name}</span>
+          ${typeLabel}
+          <span class="meta item-number">#${it.number||'-'}</span>
+        </div>
+        <div class="meta item-line-2">开始: ${it.startDate||'-'}</div>
+      </div>
+      <div class="ops">
+        <button class="ghost btnEdit" data-id="${it.id}" type="button">编辑</button>
+        <button class="ghost btnDel" data-id="${it.id}" type="button">删除</button>
+      </div>
+    </div>`;
+  }).join(''); 
+  // --- 修改结束 ---
   
   L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
   
   L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=items.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); 
   
-  // 【修改】删除按钮改为 async，并调用 API
-  L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ // ⬅️ async
+  L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ 
     e.stopPropagation(); 
     if(!confirm('确定删除该项目？'))return; 
     const id=b.dataset.id;
     try {
-      await api('/api/items?id=' + id, { method: 'DELETE' }); // ⬅️ API 调用
+      await api('/api/items?id=' + id, { method: 'DELETE' }); 
       items=items.filter(x=>x.id!==id); 
       if(activeId===id) activeId=items[0]?.id||null; 
-      render(); // ⬅️ 移除 save()
+      render(); 
     } catch (err) {
       alert('删除失败: ' + err.message);
     }
@@ -152,22 +207,18 @@ function render(){
   
   const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>还没有项目，点击右上角“添加项目”。</div>'; return } const months=Number($('#months').value)||24; const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; head.innerHTML=mlist.map(m=>{const q=Math.ceil((m.getMonth()+1)/3); return `<div class="cell nowrap" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`}).join(''); grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; const it=data[0]; const m0=startOfMonth(new Date(it.startDate)); const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; const cells=[]; for(let i=0;i<mlist.length;i++){ const idx=MonthIndex(mlist[i]); if(it.type==='warranty'){ const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); cells.push(`<div class=cell style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); }else{ const amount=resolvePlanPrice(it.pricePhases,idx); const cancel=isInCancel(it.cancelWindows,idx); cells.push(`<div class=cell style="text-align:center">${cancel?'<div class="badge cancel">退会期</div>':''}${amount!=null?`<div class=badge>￥ ${amount.toLocaleString()}</div>`:''}</div>`); } } grid.innerHTML=cells.join(''); 
 
-  // 【新增】初始化 SortableJS
   sortableList = new Sortable(L, {
     animation: 150,
-    handle: '.item', // 拖拽手柄
-    onEnd: async (evt) => { // 拖拽结束事件
-      // 1. 更新本地数组顺序
+    handle: '.item', 
+    onEnd: async (evt) => { 
       const [movedItem] = items.splice(evt.oldIndex, 1);
       items.splice(evt.newIndex, 0, movedItem);
 
-      // 2. 准备批量 API 更新
       const updates = [];
       items.forEach((it, idx) => {
-        const newOrder = idx + 1; // 使用 1-based 索引作为排序值
-        if (it.order !== newOrder) { // 仅当 order 变化时才更新
-          it.order = newOrder; // 更新本地对象
-          // 准备 API 调用，只发送 order 字段
+        const newOrder = idx + 1; 
+        if (it.order !== newOrder) { 
+          it.order = newOrder; 
           updates.push(api(`/api/items?id=${it.id}`, {
             method: 'PUT',
             headers: {'content-type': 'application/json'},
@@ -176,53 +227,46 @@ function render(){
         }
       });
 
-      // 3. 并发执行所有更新
       if(updates.length > 0) {
         try {
           await Promise.all(updates);
         } catch (e) {
           alert('保存排序失败: ' + e.message);
-          // 失败时从云端重新加载，防止不一致
           await loadCloudItems();
         }
       }
-      // 4. 重新渲染以确保 activeId 等状态正确 (可选，但推荐)
       render();
     }
   });
 }
 $('#f_type').onchange=syncTypeUI; $('#btnAdd').onclick=()=>{ editingId=null; fillForm(null); $('#dlgTitle').textContent='新增项目'; $('#dlg').style.display='flex'; }; $('#btnClose').onclick=()=>$('#dlg').style.display='none'; $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
 
-// 【修改】保存按钮改为 async，并调用 API (POST / PUT)
-$('#btnSave').onclick= async ()=>{ // ⬅️ async
+$('#btnSave').onclick= async ()=>{ 
   const it = readForm(); 
   if(!it) return;
   
   $('#btnSave').disabled = true;
   try {
     if (editingId) {
-      // 编辑 (PUT)
-      const updatedItem = { ...it, id: editingId }; // 确保 it 对象有 id
+      const updatedItem = { ...it, id: editingId }; 
       await api('/api/items?id=' + editingId, {
         method: 'PUT',
         headers: {'content-type': 'application/json'},
         body: JSON.stringify(updatedItem)
       });
-      // 更新本地数组
       const idx = items.findIndex(x => x.id === editingId);
       if (idx >= 0) items[idx] = updatedItem;
     } else {
-      // 新增 (POST)
       const newItem = await api('/api/items', {
         method: 'POST',
         headers: {'content-type': 'application/json'},
         body: JSON.stringify(it)
       });
-      items.push(newItem); // ⬅️ 使用 API 返回的带 ID 和 order 的对象
+      items.push(newItem); 
       if (!activeId) activeId = newItem.id;
     }
     $('#dlg').style.display='none';
-    render(); // ⬅️ 移除 save()
+    render(); 
   } catch (e) {
     alert('保存失败: ' + e.message);
   } finally {
@@ -236,7 +280,6 @@ async function api(path, init){
   const text = await r.text();
   let data; try{ data = JSON.parse(text||'{}') }catch{ data = { error:text||'网络错误' } }
   if(!r.ok){
-    // 【修改】如果未授权，触发登录
     if (r.status === 401 && path !== '/api/login' && path !== '/api/register') {
       ONLINE = false;
       $('#modePill').textContent = '未登录';
@@ -250,16 +293,14 @@ async function api(path, init){
   return data;
 }
 
-// 【修改】登录按钮重命名为 btnUser
 $('#btnUser').onclick=()=>{ $('#em').value=''; $('#pw').value=''; $('#msg').textContent=''; $('#dlgAuth').style.display='flex'; }; 
 $('#btnAuthCancel').onclick=()=>$('#dlgAuth').style.display='none';
 
-// 【新增】登出按钮
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
   try {
     await api('/api/logout', { method: 'POST' });
-    location.reload(); // 刷新页面
+    location.reload(); 
   } catch (e) {
     alert('登出失败: ' + e.message);
   }
@@ -267,7 +308,6 @@ $('#btnLogout').onclick = async () => {
 
 $('#goReg').onclick=async()=>{ const b=$('#goReg'); b.disabled=true; try{ await api('/api/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(), password:$('#pw').value})}); $('#msg').style.color='#16a34a'; $('#msg').textContent='注册成功，请点击登录'; }catch(e){ $('#msg').style.color='#ef4444'; $('#msg').textContent=e.message||'注册失败'; } finally{ b.disabled=false; } }
 
-// 【修改】登录成功后加载云端数据
 $('#goLogin').onclick = async ()=>{
   const b=$('#goLogin'); b.disabled=true;
   try{
@@ -276,15 +316,14 @@ $('#goLogin').onclick = async ()=>{
       headers:{'content-type':'application/json'},
       body: JSON.stringify({ email: $('#em').value.trim(), password: $('#pw').value })
     });
-    // 登录成功，获取 'me' 信息并加载数据
     const me = await api('/api/me'); 
     ONLINE=true; 
     $('#modePill').textContent='云端'; 
-    $('#btnUser').textContent = me.email; // 显示邮箱
-    $('#btnLogout').style.display = 'inline-block'; // 显示登出按钮
+    $('#btnUser').textContent = me.email; 
+    $('#btnLogout').style.display = 'inline-block'; 
     $('#dlgAuth').style.display='none';
     
-    await loadCloudItems(); // ⬅️ 加载云端数据
+    await loadCloudItems(); 
 
   }catch(e){
     $('#msg').style.color='#ef4444';
@@ -292,10 +331,9 @@ $('#goLogin').onclick = async ()=>{
   }finally{ b.disabled=false; }
 };
 
-// 【新增】从云端加载项目
 async function loadCloudItems() {
   try {
-    items = await api('/api/items'); // GET /api/items
+    items = await api('/api/items'); 
     if (items.length > 0 && !items.find(it => it.id === activeId)) {
       activeId = items[0].id;
     }
@@ -305,7 +343,6 @@ async function loadCloudItems() {
   }
 }
 
-// 【新增】检查登录状态
 async function checkLogin() {
   try {
     const me = await api('/api/me');
@@ -315,7 +352,6 @@ async function checkLogin() {
     $('#btnLogout').style.display = 'inline-block';
     await loadCloudItems();
   } catch (e) {
-    // 未登录
     ONLINE = false;
     $('#modePill').textContent = '未登录';
     $('#btnUser').textContent = '登录/注册';
@@ -323,9 +359,8 @@ async function checkLogin() {
   }
 }
 
-// 【修改】bootstrap 函数
 function bootstrap(){ 
-  checkLogin(); // ⬅️ 不再加载本地数据，改为检查登录
+  checkLogin(); 
 }
 bootstrap();
 </script>
