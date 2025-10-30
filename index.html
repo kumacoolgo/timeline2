@@ -430,9 +430,41 @@ function render(){
     }
   }); 
   
-  const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; return } 
+  const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); 
+
+  // --- 【修改】计算时间轴的统一
+  let earliestDate = null;
+  // 1. 优先从 allCloudItems (所有项目) 中找到最早的日期
+  if (allCloudItems.length > 0) {
+    const allDates = allCloudItems
+      .map(it => new Date(it.startDate))
+      .filter(d => !isNaN(d.getTime())); // 过滤掉无效日期
+    
+    if (allDates.length > 0) {
+      earliestDate = new Date(Math.min.apply(null, allDates)); // 找到最早的
+    }
+  } 
+  
+  // 2. 兜底：如果 allCloudItems 为空(或无有效日期)，则使用当前选中的项目
+  if (!earliestDate && data.length > 0 && data[0].startDate) {
+    const d = new Date(data[0].startDate);
+    if (!isNaN(d.getTime())) earliestDate = d;
+  } 
+  
+  // 3. 兜底：如果全空，则使用今天
+  if (!earliestDate) {
+    earliestDate = new Date();
+  }
+  
+  const minStart = startOfMonth(earliestDate); // 始终使用最早日期作为起点
+  // --- 【修改】结束 ---
+
+  if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; return } 
   const months=Number($('#months').value)||24; 
-  const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
+  
+  // const minStart=startOfMonth(new Date(data[0].startDate||new Date())); // <-- 【已删除】旧的这行
+  
+  const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
   const today = new Date();
@@ -464,11 +496,17 @@ function render(){
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   const it=data[0]; 
+
+  // 【重要修复】这里的 m0 必须是 *当前项目* 的开始日期，
+  // 而不是全局最早日期，这样相对月份 (idx) 才能计算正确
   const m0=startOfMonth(new Date(it.startDate)); 
+  
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
   
   const cells=[]; 
   for(let i=0;i<mlist.length;i++){ 
+    // mlist[i] 是 *全局* 时间轴的日期 (e.g., 2020-01-01)
+    // idx 是 *当前项目* 的相对月份 (e.g., 第 1 个月, 或 第 60 个月)
     const idx=MonthIndex(mlist[i]); 
     const m = mlist[i];
     const mYear = m.getFullYear();
@@ -711,7 +749,7 @@ $('#btnResetCancel').onclick = () => DlgAuth.hide();
 
 $('#btnGoReg').onclick = () => DlgAuth.switchView('register');
 $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
-$('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
+$('#btnGoLoginReset').onclick = () => DlgAuth.show('login');
 $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
 
 // 登出
