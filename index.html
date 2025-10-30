@@ -45,10 +45,31 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 /* --- 修改结束 --- */
 
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
-.cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px}
+.cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px; position: relative;}
 .nowrap{white-space:nowrap}
 .badge{display:inline-block;padding:6px 10px;border-radius:10px;background:#eef5ff;color:#0f172a;border:1px solid #dbe8ff}
 .badge.cancel{background:#fff6f1;border-color:#ffd8bf}
+
+/* 【新增】不同金额段的背景色 */
+.badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } /* 浅蓝色 */
+.badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } /* 浅黄色 */
+/* --- 新增结束 --- */
+
+
+/* 【新增】“今天”竖线样式 */
+.cell.today::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%; /* 居中 */
+  width: 2px; /* 竖线宽度 */
+  background-color: var(--brand); /* 品牌蓝色 */
+  z-index: 10;
+}
+/* --- 新增结束 --- */
+
+
 #dlg{position:fixed; inset:0; display:none; align-items:center; justify-content:center;background:rgba(0,0,0,.35); z-index:9999}
 #panel{width:min(680px,92vw); max-height:92vh; overflow:auto;background:#fff;border-radius:14px;padding:14px; box-shadow:0 12px 32px rgba(0,0,0,.18)}
 fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:6px}
@@ -269,7 +290,8 @@ function fillForm(it){
   syncTypeUI(); 
 }
 
-function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a } function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
+function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a } 
+function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
 function render(){ 
@@ -359,10 +381,16 @@ function render(){
   const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
+  // 【新增】获取今天的年月，用于标记
+  const today = new Date();
+  const todayYm = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
+  // --- 新增结束 ---
+
   head.innerHTML=mlist.map(m=>{
     const q=Math.ceil((m.getMonth()+1)/3); 
     const ym = `${m.getFullYear()}-${pad2(m.getMonth() + 1)}`;
-    return `<div class="cell nowrap" data-ym="${ym}" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`
+    // 【修改】添加 today 样式类
+    return `<div class="cell nowrap ${ym === todayYm ? 'today' : ''}" data-ym="${ym}" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`
   }).join(''); 
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
@@ -376,11 +404,33 @@ function render(){
     const idx=MonthIndex(mlist[i]); 
     if(it.type==='warranty'){ 
       const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); 
-      cells.push(`<div class=cell style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); 
+      // 【修改】添加 today 样式类
+      const ym = `${mlist[i].getFullYear()}-${pad2(mlist[i].getMonth() + 1)}`;
+      cells.push(`<div class="cell ${ym === todayYm ? 'today' : ''}" style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); 
     }else{ 
       const amount=resolvePlanPrice(it.pricePhases,idx); 
       const cancel=isInCancel(it.cancelWindows,idx); 
-      cells.push(`<div class=cell style="text-align:center">${cancel?'<div class="badge cancel">退会期</div>':''}${amount!=null?`<div class=badge>￥ ${amount.toLocaleString()}</div>`:''}</div>`); 
+
+      // 【新增】计算金额段的交替背景色
+      let amountBadgeClass = '';
+      if (amount != null) {
+        const sortedPhases = it.pricePhases.filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
+        let segmentIndex = 0;
+        for (let j = 0; j < sortedPhases.length; j++) {
+          if (idx >= sortedPhases[j].fromMonth) {
+            segmentIndex = j;
+          }
+        }
+        amountBadgeClass = (segmentIndex % 2 === 0) ? 'amount-segment-1' : 'amount-segment-2';
+      }
+      // --- 新增结束 ---
+
+      // 【修改】调整退会期和金额的顺序，并添加 today 样式类
+      const ym = `${mlist[i].getFullYear()}-${pad2(mlist[i].getMonth() + 1)}`;
+      cells.push(`<div class="cell ${ym === todayYm ? 'today' : ''}" style="text-align:center">
+        ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${amount.toLocaleString()}</div>`:''}
+        ${cancel?'<div class="badge cancel">退会期</div>':''}
+      </div>`); 
     } 
   } 
   grid.innerHTML=cells.join(''); 
@@ -456,16 +506,23 @@ $('#btnSave').onclick= async ()=>{
 $('#btnToday').onclick=()=>{
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
-  const todayCell = $(`#gridHead [data-ym="${ym}"]`);
+  const gridContainer = $('#grid').parentElement;
   
-  if (todayCell) {
-    const gridContainer = $('#grid').parentElement;
+  // 查找今天所在的月份单元格
+  const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
+  
+  if (todayCellHead) {
+    // 滚动到今天所在月份的头部单元格
     gridContainer.scrollTo({
-      left: todayCell.offsetLeft - gridContainer.offsetLeft - 10, 
+      left: todayCellHead.offsetLeft - gridContainer.offsetLeft - 10, 
       behavior: 'smooth'
     });
   } else {
-    console.warn('Today is not in the current timeline view.');
+    // 如果今天不在当前显示的月份范围内，重新渲染以包含今天
+    alert('今天不在当前显示的时间范围内，将重新渲染时间轴。');
+    // 可以考虑调整 `months` 的值或 `minStart` 来确保今天显示
+    // 但此处为了简化，仅提示
+    render(); 
   }
 };
 
@@ -534,6 +591,9 @@ $('#goLogin').onclick = async ()=>{
 async function loadCloudItems() {
   try {
     allCloudItems = await api('/api/items'); 
+    // 确保 allCloudItems 按照 order 字段排序
+    allCloudItems.sort((a, b) => (a.order || 0) - (b.order || 0));
+
     if (allCloudItems.length > 0 && !allCloudItems.find(it => it.id === activeId)) {
       activeId = allCloudItems[0].id;
     }
