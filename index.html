@@ -54,6 +54,43 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:6px}
 fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:8px;align-items:center;margin:6px 0}
 .row-fields input{width:120px} .row-fields .m{width:80px} .row-fields .a{width:120px}
+
+/* --- 【新】添加的图标按钮样式 --- */
+.icon-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 30px; /* 调整大小以适应弹窗 */
+    height: 30px;
+    border: none;
+    border-radius: 50%; /* 圆形按钮 */
+    font-size: 1.1rem;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.2s;
+}
+/* 减号按钮 ➖ */
+.delete-btn {
+    background-color: #fff0f0;
+    color: #d93025;
+    border: 1px solid #f5c6cb;
+}
+.delete-btn:hover {
+    background-color: #f8d7da;
+}
+/* 加号按钮 ➕ */
+.add-btn {
+    background-color: #e6f7ff;
+    color: #1890ff;
+    border: 1px solid #b0dfff;
+}
+.add-btn:hover {
+    background-color: #d9efff;
+}
+/* --- 样式添加结束 --- */
+
 @media (max-width: 860px){
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
@@ -110,8 +147,22 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     </div>
     <div id="blockPlan">
       <div class="row" style="margin-top:6px"><label class="small">出账日</label><input id="f_bill" type="number" min="1" max="28" value="1" style="width:80px"/></div>
-      <fieldset><legend>金额段（从第 X 个月起，￥金额 / 月）</legend><div id="phaseList"></div><div style="margin-top:6px"><button id="btnAddPhase" class="ghost" type="button">加金额段</button></div></fieldset>
-      <fieldset><legend>退会期（从第 X ～ 第 Y 个月为退会期）</legend><div id="cancelList"></div><div style="margin-top:6px"><button id="btnAddCancel" class="ghost" type="button">加退会期</button></div></fieldset>
+      
+      <fieldset>
+        <legend>金额段（从第 X 个月起，￥金额 / 月）</legend>
+        <div id="phaseList"></div>
+        <div style="margin-top:6px">
+          <button id="btnAddPhase" class="icon-btn add-btn" type="button">➕</button>
+        </div>
+      </fieldset>
+      
+      <fieldset>
+        <legend>退会期（从第 X ～ 第 Y 个月为退会期）</legend>
+        <div id="cancelList"></div>
+        <div style="margin-top:6px">
+          <button id="btnAddCancel" class="icon-btn add-btn" type="button">➕</button>
+        </div>
+      </fieldset>
       
       <div id="subBlockInsurance" style="display:none; margin-top:8px;">
         <label class="small">保期</label>
@@ -154,8 +205,9 @@ function syncTypeUI(){
   $('#subBlockInsurance').style.display=(t==='insurance')?'block':'none';
 }
 
-function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>日元/月</span><button class="ghost del" type="button">删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
-function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="ghost del" type="button">删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
+// 【修改】JS 中动态生成的按钮已改为图标
+function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>日元/月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
+function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
 function readForm(){ 
