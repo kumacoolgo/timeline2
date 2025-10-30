@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>费用时间轴</title>
 <style>
-/* 【修改】增加行高以容纳三行 */
 :root{--brand:#3b82f6;--muted:#667085;--card:#ffffff;--line:#eef0f3;--pill:#f1f5ff;--row-h:72px;--col-w:110px;--radius:14px}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#f6f8fb;color:#0f172a;font:14px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial}
@@ -23,8 +22,6 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 #btnUser { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #layout{display:grid;grid-template-columns: 340px 1fr; gap:14px; align-items:start}
-/* #leftWrap{max-height: calc(var(--row-h) * 10 + 8px);overflow-y:auto;padding-right:6px} */
-/* 桌面端：左侧列表只显示 4 条，多的用滚轮 */
 @media (min-width: 861px){
   #leftWrap{
     /* 4 行 * 行高 + 3 个间距(每行之间 8px) + 顶部/底部余量 */
@@ -33,14 +30,6 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
     padding-right: 6px; /* 预留滚动条空间 */
   }
 }
-/* 【注意】
-  此处 @media (max-width: 860px) 的 #leftWrap 样式
-  被文件末尾的 @media (max-width: 860px) 覆盖，
-  所以我们去修改末尾的那个规则。
-*/
-/* @media (max-width: 860px){
-  #leftWrap { max-height: 25vh; }
-} */
 
 .item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;height:var(--row-h);gap:8px;margin-bottom:8px;cursor:grab}
 .item:active { cursor: grabbing; }
@@ -49,18 +38,16 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .item-line-1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .item-line-1 .item-number { margin-left: auto; flex-shrink: 0; font-size: 12px; color: var(--muted); }
 
-/* 【修改】移除 .item-line-2 的 flex 布局 */
 .item-line-2 { 
   font-size: 12px; 
   color: var(--muted); 
   margin-top: 2px; 
 }
-/* 【新增】.item-line-3 样式 */
+
 .item-line-3 {
   font-size: 12px; 
   margin-top: 2px;
 }
-/* --- 修改结束 --- */
 
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
 .cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px; position: relative;}
@@ -68,17 +55,9 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .badge{display:inline-block;padding:6px 10px;border-radius:10px;background:#eef5ff;color:#0f172a;border:1px solid #dbe8ff}
 .badge.cancel{background:#fff6f1;border-color:#ffd8bf}
 
-/* 【新增】不同金额段的背景色 */
 .badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } /* 浅蓝色 */
 .badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } /* 浅黄色 */
-/* --- 新增结束 --- */
 
-
-/* 【修改】“今天”竖线样式 - 移除 ::before */
-/* .cell.today::before { ... } */
-/* --- 修改结束 --- */
-
-/* 【新增】新的基于 Grid 的“今天”竖线样式 */
 .today-line {
   position: relative; /* 作为一个 grid item */
   grid-row: 1; /* 确保在第一行 */
@@ -89,24 +68,18 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
   z-index: 10;
   pointer-events: none; /* 防止遮挡内容 */
 }
-/* --- 新增结束 --- */
-
 
 #dlg{position:fixed; inset:0; display:none; align-items:center; justify-content:center;background:rgba(0,0,0,.35); z-index:9999}
 #panel{width:min(680px,92vw); max-height:92vh; overflow:auto;background:#fff;border-radius:14px;padding:14px; box-shadow:0 12px 32px rgba(0,0,0,.18)}
 fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:6px}
 fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:8px;align-items:center;margin:6px 0}
 
-/* --- 【修改】调整了 input 宽度 --- */
 .row-fields input{width:100px} 
 .row-fields .m{width:60px}   /* 金额段-月 */
 .row-fields .a{width:80px}   /* 金额段-金额 */
 .row-fields .fm{width:60px}  /* 退会期-开始月 */
 .row-fields .tm{width:60px}  /* 退会期-结束月 */
-/* --- 修改结束 --- */
 
-
-/* --- 【新】添加的图标按钮样式 --- */
 .icon-btn {
     display: flex;
     justify-content: center;
@@ -140,24 +113,20 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 .add-btn:hover {
     background-color: #d9efff;
 }
-/* --- 样式添加结束 --- */
 
 @media (max-width: 860px){
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
-  /* --- 【修改】强制金额段和退会期行不换行 --- */
   #phaseList .row-fields,
   #cancelList .row-fields {
     flex-wrap: nowrap;
   }
   
-  /* --- 【修改】为移动端添加 overflow-y: auto; --- */
   #leftWrap { 
-    max-height: 25vh; 
+    max-height: 20vh; 
     overflow-y: auto;
     padding-right: 6px; /* 预留滚动条空间 */
   }
-  /* --- 修改结束 --- */
 }
 </style>
 </head>
@@ -180,7 +149,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       <label class="small">月数</label>
       <input id="months" type="number" value="24" min="1" max="120" style="width: 70px;">
       <button id="btnRenderMonths" class="ghost" style="padding: 8px 10px;">显示</button>
-      <button id="btnToday" class="ghost">跳到今天</button>
+      <button id="btnToday" class="ghost">今天</button>
     </div>
     <div class="row">
       <button id="btnAdd"  class="primary" style="width: 100%;">添加项目</button>
@@ -224,7 +193,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       <div class="row" style="margin-top:6px"><label class="small">出账日</label><input id="f_bill" type="number" min="1" max="28" value="1" style="width:80px"/></div>
       
       <fieldset>
-        <legend>金额段（从第 X 个月起，￥金额 / 月）</legend>
+        <legend>金额（从第 X 个月起，￥金额 / 月）</legend>
         <div id="phaseList"></div>
         <div style="margin-top:6px">
           <button id="btnAddPhase" class="icon-btn add-btn" type="button">➕</button>
@@ -232,7 +201,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       </fieldset>
       
       <fieldset>
-        <legend>退会期（从第 X ～ 第 Y 个月为退会期）</legend>
+        <legend>退会（从第 X ～ 第 Y 个月为退会期）</legend>
         <div id="cancelList"></div>
         <div style="margin-top:6px">
           <button id="btnAddCancel" class="icon-btn add-btn" type="button">➕</button>
@@ -280,7 +249,6 @@ function syncTypeUI(){
   $('#subBlockInsurance').style.display=(t==='insurance')?'block':'none';
 }
 
-// 【JS 未修改】JS 函数已正确，CSS 负责处理布局
 function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>日元/月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
@@ -410,18 +378,15 @@ function render(){
   const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
-  // 【修改】获取今天的年月日
   const today = new Date();
   const todayY = today.getFullYear();
   const todayM = today.getMonth();
   const todayD = today.getDate();
-  // --- 修改结束 ---
 
   head.innerHTML=mlist.map(m=>{
     const q=Math.ceil((m.getMonth()+1)/3); 
     const ym = `${m.getFullYear()}-${pad2(m.getMonth() + 1)}`;
     
-    // 【修改】为 "today" 竖线准备 grid
     const mYear = m.getFullYear();
     const mMonth = m.getMonth();
     const isTodayMonth = mYear === todayY && mMonth === todayM;
@@ -450,7 +415,6 @@ function render(){
   for(let i=0;i<mlist.length;i++){ 
     const idx=MonthIndex(mlist[i]); 
     
-    // 【修改】为 "today" 竖线准备 grid
     const m = mlist[i];
     const mYear = m.getFullYear();
     const mMonth = m.getMonth();
@@ -466,7 +430,6 @@ function render(){
     const contentDivEnd = `</div>`;
     // 竖线层
     const todayLine = isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : '';
-    // --- 修改结束 ---
 
     if(it.type==='warranty'){ 
       const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); 
@@ -571,7 +534,6 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
-// 【修改】"跳到今天" 按钮逻辑
 $('#btnToday').onclick=()=>{
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
@@ -585,8 +547,6 @@ $('#btnToday').onclick=()=>{
     let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10; // 默认滚动到单元格开头
 
     if (todayLine) {
-      // 如果找到了竖线，精确计算滚动位置
-      // 目标：让竖线大致位于视口的 1/3 处或中央
       const lineLeftInCell = todayLine.offsetLeft;
       const targetScroll = todayCellHead.offsetLeft + lineLeftInCell - (gridContainer.clientWidth / 3);
       scrollLeft = Math.max(0, targetScroll); // 防止滚动到负数
