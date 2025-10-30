@@ -49,12 +49,12 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } 
 .badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } 
 
-.today-line {
-  position: relative; grid-row: 1; height: 100%; width: 2px;
-  background-color: var(--brand);
-  transform: translateX(-50%); 
-  z-index: 10;
-  pointer-events: none;
+/* 【修改】删除了 .today-line */
+
+/* 【新增】当月背景色 */
+.cell.today-month {
+  background-color: #eef5ff; /* 浅蓝色 */
+  border-color: #dbe8ff;
 }
 
 #dlg{position:fixed; inset:0; display:none; align-items:center; justify-content:center;background:rgba(0,0,0,.35); z-index:9999}
@@ -267,7 +267,6 @@ function addPhase(i){const d=document.createElement('div');d.className='row-fiel
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
-// 【修改】readForm() - 删除了 displayMonths
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
@@ -313,7 +312,7 @@ function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.s
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
-// 【新增】滚动到 "今天" 的辅助函数
+// 【修改】滚动到 "今天" 的辅助函数 - 改为滚动到左侧
 function scrollToToday(behavior = 'smooth') {
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
@@ -321,26 +320,15 @@ function scrollToToday(behavior = 'smooth') {
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
-    const todayLine = todayCellHead.querySelector('.today-line');
-    const containerWidth = gridContainer.clientWidth;
-    let targetScroll = 0;
-    
-    if (todayLine) {
-      // 居中 "今天" 的红线
-      targetScroll = todayCellHead.offsetLeft + todayLine.offsetLeft - (containerWidth / 2) + (todayLine.clientWidth / 2);
-    } else {
-      // 居中 "今天" 所在的月份格子
-      targetScroll = todayCellHead.offsetLeft - (containerWidth / 2) + (todayCellHead.clientWidth / 2);
-    }
+    // 【修改】滚动到最左侧, 留 10px 边距
+    const targetScroll = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
     gridContainer.scrollTo({ left: Math.max(0, targetScroll), behavior: behavior });
+    
   } else {
-    // "今天" 不在渲染范围内 (例如项目是 2028 年才开始)
-    // 此时不做任何事，保持在项目起点
     console.warn('Today is not in the rendered range.');
   }
 }
 
-// 【修改】 render() 函数 - 自动计算月数并自动滚动到 "今天"
 function render(){ 
   // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
@@ -429,34 +417,25 @@ function render(){
   const it = data[0]; 
   
   // --- 【修改】自动计算时间轴起止点 ---
-  // 1. 计算 minStart
   const minStart = startOfMonth(new Date(it.startDate || new Date()));
-
-  // 2. 计算 maxEnd
   const today = new Date();
   const todayPlusOneYear = addMonths(today, 12);
-
-  // 候选终点：至少是 (今天+1年) 或 (项目起点)
   let maxEndCandidate = MaxDate(todayPlusOneYear, minStart);
-  
   const itemStartDate = new Date(it.startDate);
   
   if (it.type === 'plan' || it.type === 'insurance') {
-    // 检查最后金额设定日
     if (it.pricePhases && it.pricePhases.length > 0) {
       const lastPhase = it.pricePhases.sort((a,b) => b.fromMonth - a.fromMonth)[0];
       const lastPhaseMonth = (lastPhase.fromMonth || 1) - 1;
       const lastPhaseDate = addMonths(itemStartDate, lastPhaseMonth);
       maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastPhaseDate, 12));
     }
-    // 检查最后退会期
     if (it.cancelWindows && it.cancelWindows.length > 0) {
       const lastWindow = it.cancelWindows.sort((a,b) => b.toMonth - a.toMonth)[0];
       const lastWindowMonth = (lastWindow.toMonth || 1) - 1; 
       const lastWindowDate = addMonths(itemStartDate, lastWindowMonth);
       maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastWindowDate, 12));
     }
-    // 检查保期 (仅 insurance)
     if (it.type === 'insurance') {
       const policyMonths = (Number(it.policyTermYears) || 0) * 12 + (Number(it.policyTermMonths) || 0);
       if (policyMonths > 0) {
@@ -465,7 +444,6 @@ function render(){
       }
     }
   } else if (it.type === 'warranty') {
-    // 检查保修期
     const warrantyMonths = Number(it.warrantyMonths) || 0;
     if (warrantyMonths > 0) {
       const warrantyEndDate = addMonths(itemStartDate, warrantyMonths);
@@ -497,15 +475,16 @@ function render(){
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
     const totalCols = daysInMonth + 2; 
-    const lineCol = isTodayMonth ? (todayD + 1) : -1;
+    // 【修改】删除了 lineCol
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
 
-    return `<div class="cell nowrap" data-ym="${ym}" style="text-align:center; ${gridStyle}">
+    // 【修改】添加 'today-month' class, 移除 today-line
+    return `<div class="cell nowrap ${isTodayMonth ? 'today-month' : ''}" data-ym="${ym}" style="text-align:center; ${gridStyle}">
       <div style="grid-column: 1 / -1; z-index: 5;">
         <div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div>
         <div class=small>Q${q}</div>
       </div>
-      ${isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : ''}
+      ${/* 【修改】today-line 已移除 */ ''}
     </div>`;
   }).join(''); 
   
@@ -522,30 +501,27 @@ function render(){
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
     const totalCols = daysInMonth + 2; 
-    const lineCol = isTodayMonth ? (todayD + 1) : -1;
+    // 【修改】删除了 lineCol
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
     const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
     const contentDivEnd = `</div>`;
-    const todayLine = isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : '';
+    // 【修改】删除了 todayLine
 
     if(it.type==='warranty'){ 
       const warrantyMonths = Number(it.warrantyMonths || 0);
-      let warrantyBadge = ''; // 默认为空
-
+      let warrantyBadge = ''; 
       if (idx >= 1 && idx <= warrantyMonths) {
-        // 状态1: 在保修期内
         warrantyBadge = '<span class="badge">保修中</span>';
       } else if (idx > warrantyMonths && warrantyMonths > 0) { 
-        // 状态2: 保修期已过 (并且设置了保修期)
-        // 我们使用 .cancel 样式使其显示为不同颜色 (例如橙色)
         warrantyBadge = '<span class="badge cancel">保修外</span>';
       }
 
-      cells.push(`<div class="cell" style="text-align:center; ${gridStyle}">
+      // 【修改】添加 'today-month' class, 移除 todayLine
+      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
         ${contentDivStart}
           ${warrantyBadge} 
         ${contentDivEnd}
-        ${todayLine}
+        ${/* 【修改】today-line 已移除 */ ''}
       </div>`); 
     }else{ 
       const amount=resolvePlanPrice(it.pricePhases,idx); 
@@ -561,12 +537,14 @@ function render(){
         }
         amountBadgeClass = (segmentIndex % 2 === 0) ? 'amount-segment-1' : 'amount-segment-2';
       }
-      cells.push(`<div class="cell" style="text-align:center; ${gridStyle}">
+      
+      // 【修改】添加 'today-month' class, 移除 todayLine
+      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
         ${contentDivStart}
           ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${amount.toLocaleString()}</div>`:''}
           ${cancel?'<div class="badge cancel">退会期</div>':''}
         ${contentDivEnd}
-        ${todayLine}
+        ${/* 【修改】today-line 已移除 */ ''}
       </div>`); 
     } 
   } 
@@ -606,7 +584,6 @@ function render(){
     }
   });
   
-  // --- 【修改】切换项目时, 自动滚动到 "今天" (无动画) ---
   setTimeout(() => {
     scrollToToday('auto'); // 'auto' for instant scroll
   }, 0);
@@ -642,7 +619,6 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
-// 【修改】"今天" 按钮 - 仅滚动 (有动画)
 $('#btnToday').onclick = async () => {
   scrollToToday('smooth');
 };
