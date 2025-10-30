@@ -318,21 +318,35 @@ function addPhase(i){const d=document.createElement('div');d.className='row-fiel
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
+// --- 【修改 1】: readForm() 现在会保存月数 ---
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
+  
+  // 【新增】读取当前输入框的月数
+  const displayMonths = Number($('#months').value) || 24;
+  
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
+  
   if(type==='warranty'){
-    return {id:editingId||undefined,...base,warrantyMonths:Number($('#f_wm').value)||0}
+    return {
+      id:editingId||undefined,
+      ...base,
+      warrantyMonths:Number($('#f_wm').value)||0,
+      displayMonths: displayMonths // 【新增】保存月数
+    }
   } 
+  
   const phases=[...$$('#phaseList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1,amount:Number(r.querySelector('input.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth); 
   const cancels=[...$$('#cancelList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); 
+  
   return {
     id:editingId||undefined,...base,
     billingDay:Number($('#f_bill').value)||1,
     pricePhases:phases, cancelWindows:cancels,
     policyTermYears: Number($('#f_ins_y').value) || 0,
-    policyTermMonths: Number($('#f_ins_m').value) || 0
+    policyTermMonths: Number($('#f_ins_m').value) || 0,
+    displayMonths: displayMonths // 【新增】保存月数
   }; 
 }
 
@@ -356,7 +370,9 @@ function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.s
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
+// --- 【修改 3】: render() 恢复原状，并读取项目的月数 ---
 function render(){ 
+  // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
   if (!term) {
     items = [...allCloudItems]; 
@@ -370,7 +386,9 @@ function render(){
   if (!items.find(it => it.id === activeId)) {
     activeId = items[0]?.id || null;
   }
+  // --- 过滤结束 ---
 
+  // --- 2. 渲染左侧列表 ---
   const L=$('#leftWrap');
   if(sortableList) {
     sortableList.destroy();
@@ -417,7 +435,9 @@ function render(){
   }).join(''); 
   
   L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
+  
   L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=allCloudItems.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); 
+  
   L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ 
     e.stopPropagation(); 
     if(!confirm('确定删除该项目？'))return; 
@@ -430,40 +450,27 @@ function render(){
     }
   }); 
   
+  // --- 3. 渲染右侧时间轴 ---
   const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); 
-
-  // --- 【修改】计算时间轴的统一
-  let earliestDate = null;
-  // 1. 优先从 allCloudItems (所有项目) 中找到最早的日期
-  if (allCloudItems.length > 0) {
-    const allDates = allCloudItems
-      .map(it => new Date(it.startDate))
-      .filter(d => !isNaN(d.getTime())); // 过滤掉无效日期
-    
-    if (allDates.length > 0) {
-      earliestDate = new Date(Math.min.apply(null, allDates)); // 找到最早的
-    }
+  
+  // 【修改】如果 data (当前选中项目) 为空，则清空并返回
+  if (!data.length){ 
+    head.innerHTML=''; 
+    grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; 
+    return; 
   } 
   
-  // 2. 兜底：如果 allCloudItems 为空(或无有效日期)，则使用当前选中的项目
-  if (!earliestDate && data.length > 0 && data[0].startDate) {
-    const d = new Date(data[0].startDate);
-    if (!isNaN(d.getTime())) earliestDate = d;
-  } 
+  const it = data[0]; // 获取当前选中的项目
   
-  // 3. 兜底：如果全空，则使用今天
-  if (!earliestDate) {
-    earliestDate = new Date();
-  }
+  // 【修改】从当前项目中读取月数，并更新 UI 输入框
+  // 优先级: 1. 项目保存的值  2. 默认值 24
+  const months = Number(it.displayMonths) || 24;
+  $('#months').value = months;
   
-  const minStart = startOfMonth(earliestDate); // 始终使用最早日期作为起点
-  // --- 【修改】结束 ---
+  // 【修改】时间轴起点 *必须* 基于当前选中的项目
+  // （撤销了“统一时间轴”的修改，恢复到这个逻辑）
+  const minStart = startOfMonth(new Date(it.startDate || new Date()));
 
-  if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; return } 
-  const months=Number($('#months').value)||24; 
-  
-  // const minStart=startOfMonth(new Date(data[0].startDate||new Date())); // <-- 【已删除】旧的这行
-  
   const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
@@ -481,7 +488,7 @@ function render(){
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
     const totalCols = daysInMonth + 2; 
-    const lineCol = isTodayMonth ? (todayD + 1) : -1;
+    const lineCol = isTodayMonth ? (todayD + 1) : -1; 
     
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
 
@@ -495,27 +502,25 @@ function render(){
   }).join(''); 
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
-  const it=data[0]; 
-
-  // 【重要修复】这里的 m0 必须是 *当前项目* 的开始日期，
-  // 而不是全局最早日期，这样相对月份 (idx) 才能计算正确
+  // const it=data[0]; (这行已移动到前面)
   const m0=startOfMonth(new Date(it.startDate)); 
   
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
   
   const cells=[]; 
   for(let i=0;i<mlist.length;i++){ 
-    // mlist[i] 是 *全局* 时间轴的日期 (e.g., 2020-01-01)
-    // idx 是 *当前项目* 的相对月份 (e.g., 第 1 个月, 或 第 60 个月)
     const idx=MonthIndex(mlist[i]); 
+    
     const m = mlist[i];
     const mYear = m.getFullYear();
     const mMonth = m.getMonth();
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
     const totalCols = daysInMonth + 2; 
-    const lineCol = isTodayMonth ? (todayD + 1) : -1;
+    const lineCol = isTodayMonth ? (todayD + 1) : -1; 
+    
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
+    
     const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
     const contentDivEnd = `</div>`;
     const todayLine = isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : '';
@@ -555,6 +560,7 @@ function render(){
   } 
   grid.innerHTML=cells.join(''); 
 
+  // --- 4. 初始化拖拽排序 ---
   sortableList = new Sortable(L, {
     animation: 150,
     handle: '.item', 
@@ -626,16 +632,18 @@ $('#btnToday').onclick=()=>{
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
   const gridContainer = $('#grid').parentElement;
+  
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
+    // 查找今天所在的竖线
     const todayLine = todayCellHead.querySelector('.today-line');
-    let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10; 
+    let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10; // 默认滚动到单元格开头
 
     if (todayLine) {
       const lineLeftInCell = todayLine.offsetLeft;
       const targetScroll = todayCellHead.offsetLeft + lineLeftInCell - (gridContainer.clientWidth / 3);
-      scrollLeft = Math.max(0, targetScroll); 
+      scrollLeft = Math.max(0, targetScroll); // 防止滚动到负数
     }
     
     gridContainer.scrollTo({
@@ -643,12 +651,33 @@ $('#btnToday').onclick=()=>{
       behavior: 'smooth'
     });
   } else {
-    alert('今天不在当前显示的时间范围内，将重新渲染时间轴。');
-    render(); 
+    alert('今天不在当前显示的时间范围内，请检查项目的“开始日期”和“月数”。');
+    // render(); (不再需要，因为月数不对时，点击今天应该只提示)
   }
 };
 
-$('#btnRenderMonths').onclick = () => render();
+// --- 【修改 2】: btnRenderMonths.onclick 现在会保存月数 ---
+$('#btnRenderMonths').onclick = async () => {
+  const newMonths = Number($('#months').value) || 24;
+  const activeItem = allCloudItems.find(it => it.id === activeId);
+
+  // 检查是否登录且有选中项目
+  if (ONLINE && activeItem && activeItem.displayMonths !== newMonths) {
+    activeItem.displayMonths = newMonths; // 1. 更新本地数据
+    try {
+      // 2. 更新服务器数据
+      await api('/api/items?id=' + activeId, {
+        method: 'PUT',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify({ displayMonths: newMonths })
+      });
+    } catch (e) {
+      alert('保存月数失败: ' + e.message);
+    }
+  }
+  render(); // 3. 重新渲染
+};
+
 $('#btnSearch').onclick = () => render();
 $('#btnClearSearch').onclick = () => {
   $('#filter').value = ''; 
@@ -749,7 +778,7 @@ $('#btnResetCancel').onclick = () => DlgAuth.hide();
 
 $('#btnGoReg').onclick = () => DlgAuth.switchView('register');
 $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
-$('#btnGoLoginReset').onclick = () => DlgAuth.show('login');
+$('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
 $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
 
 // 登出
