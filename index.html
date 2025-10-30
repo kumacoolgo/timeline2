@@ -156,10 +156,18 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     </div>
     
     <div class="row" style="gap:10px">
-      <select id="f_type"><option value="plan">套餐</option><option value="warranty">保修</option><option value="insurance">保险</option></select>
-      <input id="f_name" placeholder="项目名称"/>
-      <input id="f_number" placeholder="编号/卡号(可选)" style="width:160px"/>
-      <label class="small" for="f_start" style="margin-left: 5px;">开始日</label>
+      <select id="f_type" style="width: 100px;">
+        <option value="plan">套餐</option>
+        <option value="warranty">保修</option>
+        <option value="insurance">保险</option>
+      </select>
+      <input id="f_name" placeholder="项目名称" style="flex: 1; min-width: 0;"/>
+    </div>
+    <div class="row" style="gap:10px; margin-top: 8px;">
+      <input id="f_number" placeholder="编号/卡号(可选)" style="width: 100%;"/>
+    </div>
+    <div class="row" style="gap:10px; margin-top: 8px; align-items: center;">
+      <label class="small" for="f_start">开始日</label>
       <input id="f_start" type="date" style="width: 130px;"/>
     </div>
     <div id="blockPlan">
