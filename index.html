@@ -253,7 +253,7 @@ let allCloudItems = [];
 let items = []; 
 let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
-let isProgrammaticScroll = false; // 【新增】防止 "今天" 按钮触发滚动保存的标志
+// 【删除】删除了 isProgrammaticScroll 标志
 
 function pad2(n){return (n<10?'0':'')+n;} function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
 
@@ -405,14 +405,9 @@ function render(){
   const months = Number(it.displayMonths) || 24;
   $('#months').value = months;
   
-  let startMonthDate = null;
-  if (it.displayStartMonth) {
-    startMonthDate = new Date(it.displayStartMonth + '-01'); 
-  }
-  if (!startMonthDate || isNaN(startMonthDate)) {
-    startMonthDate = new Date(it.startDate || new Date());
-  }
-  const minStart = startOfMonth(startMonthDate);
+  // 【修复】时间轴起点 *永远* 基于项目的 startDate
+  // 删除了所有 displayStartMonth 的错误逻辑
+  const minStart = startOfMonth(new Date(it.startDate || new Date()));
   
   const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
@@ -559,7 +554,7 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
-// 【修改】"今天"按钮 - 增加了 isProgrammaticScroll 标志
+// 【修改】"今天"按钮 - 删除了 isProgrammaticScroll 标志
 $('#btnToday').onclick = async () => {
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
@@ -577,31 +572,15 @@ $('#btnToday').onclick = async () => {
       scrollLeft = Math.max(0, targetScroll);
     }
     
-    isProgrammaticScroll = true; // 【新增】禁止滚动监听
     gridContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-    setTimeout(() => { isProgrammaticScroll = false; }, 1000); // 1秒后解除禁止
     
   } else {
     // --- 没找到，重置 Profile 并重绘 ---
-    alert('今天不在当前显示的时间范围内。将重置视图到项目开始日期。');
+    alert('今天不在当前显示的时间范围内。');
     
-    const activeItem = allCloudItems.find(it => it.id === activeId);
-    if (ONLINE && activeItem) {
-      isProgrammaticScroll = true; // 【新增】禁止滚动监听
-      activeItem.displayStartMonth = null; 
-      try {
-        await api('/api/items?id=' + activeId, {
-          method: 'PUT',
-          headers: {'content-type': 'application/json'},
-          body: JSON.stringify({ displayStartMonth: null }) 
-        });
-      } catch (e) {
-        alert('重置视图失败: ' + e.message);
-      }
-    }
-    render(); 
-    setTimeout(() => { isProgrammaticScroll = false; }, 100); // render后解除禁止
-    // --- 重置结束 ---
+    // 【修改】删除了重置 profile 的逻辑，因为 "profile" (displayStartMonth) 已经不存在了
+    
+    // 只是提醒用户，不再重置视图
   }
 };
 
@@ -817,59 +796,7 @@ function bootstrap(){
 }
 bootstrap();
 
-// --- 【新增/修改】保存 "Profile" (滚动位置) ---
-let scrollTimer = null;
-const gridContainer = $('#gridContainer');
-
-gridContainer.onscroll = () => {
-  if (isProgrammaticScroll) return; // 【新增】如果是 "今天" 按钮触发的, 则忽略
-  
-  const currentActiveId = activeId; 
-  if (!ONLINE || !currentActiveId) return; 
-  
-  clearTimeout(scrollTimer);
-  
-  const scrollLeft = gridContainer.scrollLeft;
-  let closestCell = null;
-  let minDiff = Infinity;
-  
-  $$('#gridHead .cell').forEach(cell => {
-    const diff = cell.offsetLeft - scrollLeft;
-    if (diff >= -20 && diff < minDiff) { // 寻找视口左边缘(或略过一点)的第一个 cell
-      minDiff = diff;
-      closestCell = cell;
-    }
-  });
-
-  if (!closestCell) return;
-  const displayStartMonth = closestCell.dataset.ym;
-  if (!displayStartMonth) return;
-  
-  scrollTimer = setTimeout(() => {
-    saveScrollProfile(currentActiveId, displayStartMonth); 
-  }, 1000); 
-};
-
-async function saveScrollProfile(itemId, monthToSave) { 
-  if (!ONLINE || !itemId) return; 
-
-  const activeItem = allCloudItems.find(it => it.id === itemId);
-  
-  if (activeItem && activeItem.displayStartMonth !== monthToSave) {
-    activeItem.displayStartMonth = monthToSave; 
-    try {
-      // 【修复】移除了上一版代码中多余的 "G"
-      await api('/api/items?id=' + itemId, { 
-        method: 'PUT',
-        headers: {'content-type': 'application/json'},
-        body: JSON.stringify({ displayStartMonth: monthToSave })
-      });
-    } catch (e) {
-      console.warn('保存滚动位置失败: ' + e.message);
-    }
-  }
-}
-// --- 【新增】结束 ---
+// --- 【删除】所有滚动保存 (onscroll 和 saveScrollProfile) 的逻辑 ---
 
 </script>
 </body></html>
