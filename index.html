@@ -529,10 +529,21 @@ function render(){
     const todayLine = isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : '';
 
     if(it.type==='warranty'){ 
-      const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); 
+      const warrantyMonths = Number(it.warrantyMonths || 0);
+      let warrantyBadge = ''; // 默认为空
+
+      if (idx >= 1 && idx <= warrantyMonths) {
+        // 状态1: 在保修期内
+        warrantyBadge = '<span class="badge">保修中</span>';
+      } else if (idx > warrantyMonths && warrantyMonths > 0) { 
+        // 状态2: 保修期已过 (并且设置了保修期)
+        // 我们使用 .cancel 样式使其显示为不同颜色 (例如橙色)
+        warrantyBadge = '<span class="badge cancel">保修外</span>';
+      }
+
       cells.push(`<div class="cell" style="text-align:center; ${gridStyle}">
         ${contentDivStart}
-          ${inWar?'<span class=badge>保修中</span>':''}
+          ${warrantyBadge} 
         ${contentDivEnd}
         ${todayLine}
       </div>`); 
