@@ -154,7 +154,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       <b>费用时间轴</b>
       <div class="auth-group">
         <button id="btnUser" class="ghost">登录/注册</button>
-        <button id="btnLogout" class="ghost" style="display:none">登出</button>
+        <button id="btnLogout" class.ghost" style="display:none">登出</button>
       </div>
     </div>
     <div class="row">
@@ -178,7 +178,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       <div id="leftWrap"></div>
     </div>
 
-    <div class="card" style="overflow-x: auto;">
+    <div id="gridContainer" class="card" style="overflow-x: auto;">
       <div id="gridHead"></div>
       <div id="grid"></div>
     </div>
@@ -318,35 +318,28 @@ function addPhase(i){const d=document.createElement('div');d.className='row-fiel
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
-// --- 【修改 1】: readForm() 现在会保存月数 ---
+// --- (readForm 函数保持不变, 它已包含 displayMonths) ---
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
-  
-  // 【新增】读取当前输入框的月数
   const displayMonths = Number($('#months').value) || 24;
-  
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
-  
   if(type==='warranty'){
     return {
-      id:editingId||undefined,
-      ...base,
+      id:editingId||undefined, ...base,
       warrantyMonths:Number($('#f_wm').value)||0,
-      displayMonths: displayMonths // 【新增】保存月数
+      displayMonths: displayMonths 
     }
   } 
-  
   const phases=[...$$('#phaseList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1,amount:Number(r.querySelector('input.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth); 
   const cancels=[...$$('#cancelList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); 
-  
   return {
     id:editingId||undefined,...base,
     billingDay:Number($('#f_bill').value)||1,
     pricePhases:phases, cancelWindows:cancels,
     policyTermYears: Number($('#f_ins_y').value) || 0,
     policyTermMonths: Number($('#f_ins_m').value) || 0,
-    displayMonths: displayMonths // 【新增】保存月数
+    displayMonths: displayMonths 
   }; 
 }
 
@@ -370,7 +363,7 @@ function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.s
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
-// --- 【修改 3】: render() 恢复原状，并读取项目的月数 ---
+// --- 【修改 2】: render() 读取 "Profile" (月数 + 起始月份) ---
 function render(){ 
   // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
@@ -462,15 +455,26 @@ function render(){
   
   const it = data[0]; // 获取当前选中的项目
   
-  // 【修改】从当前项目中读取月数，并更新 UI 输入框
-  // 优先级: 1. 项目保存的值  2. 默认值 24
+  // 【修改】从 Profile 中读取 "月数"
+  // 优先级: 1. 项目保存的值 (it.displayMonths)  2. 默认值 24
   const months = Number(it.displayMonths) || 24;
-  $('#months').value = months;
+  $('#months').value = months; // 更新 UI 输入框
   
-  // 【修改】时间轴起点 *必须* 基于当前选中的项目
-  // （撤销了“统一时间轴”的修改，恢复到这个逻辑）
-  const minStart = startOfMonth(new Date(it.startDate || new Date()));
-
+  // --- 【修改】从 Profile 中读取 "起始月份" ---
+  let startMonthDate = null;
+  
+  // 1. 尝试从 profile (it.displayStartMonth) 读取
+  if (it.displayStartMonth) {
+    startMonthDate = new Date(it.displayStartMonth + '-01'); // e.g., "2027-07" -> Date("2027-07-01")
+  }
+  
+  // 2. 兜底：如果 profile 不存在或无效，则使用项目的 startDate
+  if (!startMonthDate || isNaN(startMonthDate.getTime())) {
+    startMonthDate = new Date(it.startDate || new Date());
+  }
+  const minStart = startOfMonth(startMonthDate);
+  // --- 【修改】结束 ---
+  
   const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
@@ -502,7 +506,6 @@ function render(){
   }).join(''); 
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
-  // const it=data[0]; (这行已移动到前面)
   const m0=startOfMonth(new Date(it.startDate)); 
   
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
@@ -567,13 +570,13 @@ function render(){
     delay: 500,
     delayOnTouchOnly: true,
     onEnd: async (evt) => { 
+      // ... (拖拽排序逻辑保持不变) ...
       const movedItem = items[evt.oldIndex]; 
       const masterIndex = allCloudItems.findIndex(it => it.id === movedItem.id);
       const [masterMovedItem] = allCloudItems.splice(masterIndex, 1);
       const newRefId = items[evt.newIndex]?.id;
       const masterNewIndex = newRefId ? allCloudItems.findIndex(it => it.id === newRefId) : allCloudItems.length;
       allCloudItems.splice(masterNewIndex, 0, masterMovedItem);
-      
       const updates = [];
       allCloudItems.forEach((it, idx) => {
         const newOrder = idx + 1; 
@@ -586,7 +589,6 @@ function render(){
           }));
         }
       });
-
       try {
         if(updates.length > 0) await Promise.all(updates);
       } catch (e) {
@@ -631,7 +633,9 @@ $('#btnSave').onclick= async ()=>{
 $('#btnToday').onclick=()=>{
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
-  const gridContainer = $('#grid').parentElement;
+  
+  // --- 【修改】使用 #gridContainer ---
+  const gridContainer = $('#gridContainer');
   
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
@@ -652,16 +656,13 @@ $('#btnToday').onclick=()=>{
     });
   } else {
     alert('今天不在当前显示的时间范围内，请检查项目的“开始日期”和“月数”。');
-    // render(); (不再需要，因为月数不对时，点击今天应该只提示)
   }
 };
 
-// --- 【修改 2】: btnRenderMonths.onclick 现在会保存月数 ---
+// --- (btnRenderMonths.onclick 保持不变, 它已能正确保存月数) ---
 $('#btnRenderMonths').onclick = async () => {
   const newMonths = Number($('#months').value) || 24;
   const activeItem = allCloudItems.find(it => it.id === activeId);
-
-  // 检查是否登录且有选中项目
   if (ONLINE && activeItem && activeItem.displayMonths !== newMonths) {
     activeItem.displayMonths = newMonths; // 1. 更新本地数据
     try {
@@ -685,65 +686,41 @@ $('#btnClearSearch').onclick = () => {
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
-// --- 【修改】认证 API ---
+// --- (api 函数... DlgAuth ... 认证流程... 保持不变) ---
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
   let data; try{ data = JSON.parse(text||'{}') }catch{ data = { error:text||'网络错误' } }
   if(!r.ok){
-    // 【修改】API 路径检查中加入新的 API
     const isAuthPath = ['/api/login', '/api/register', '/api/register-send-code', '/api/password-reset-send-code', '/api/password-reset-confirm'].includes(path);
     if (r.status === 401 && !isAuthPath) {
       ONLINE = false;
       $('#btnUser').textContent = '登录/注册';
       $('#btnLogout').style.display = 'none';
-      DlgAuth.show('login'); // 【修改】调用 DlgAuth.show()
+      DlgAuth.show('login'); 
     }
     const msg = data.reason ? `${data.error} (${data.reason})` : (data.error || `HTTP ${r.status}`);
     throw new Error(msg);
   }
   return data;
 }
-
-// --- 【新增/修改】认证弹窗逻辑 ---
 const DlgAuth = {
   el: $('#dlgAuth'),
-  views: {
-    login: $('#viewLogin'),
-    register: $('#viewRegister'),
-    reset: $('#viewReset'),
-  },
-  msgs: {
-    login: $('#login_msg'),
-    register: $('#reg_msg'),
-    reset: $('#reset_msg'),
-  },
-  
-  show(viewName = 'login') {
-    this.switchView(viewName);
-    this.el.style.display = 'flex';
-  },
-  
-  hide() {
-    this.el.style.display = 'none';
-  },
-  
+  views: { login: $('#viewLogin'), register: $('#viewRegister'), reset: $('#viewReset'), },
+  msgs: { login: $('#login_msg'), register: $('#reg_msg'), reset: $('#reset_msg'), },
+  show(viewName = 'login') { this.switchView(viewName); this.el.style.display = 'flex'; },
+  hide() { this.el.style.display = 'none'; },
   switchView(viewName) {
     Object.values(this.views).forEach(v => v.classList.remove('active'));
     Object.values(this.msgs).forEach(m => m.textContent = '');
-    if (this.views[viewName]) {
-      this.views[viewName].classList.add('active');
-    }
+    if (this.views[viewName]) { this.views[viewName].classList.add('active'); }
   },
-  
   showMsg(view, message, isError = true) {
     if (this.msgs[view]) {
       this.msgs[view].textContent = message;
       this.msgs[view].style.color = isError ? '#ef4444' : '#16a34a';
     }
   },
-  
-  // 倒计时
   startCountdown(btn) {
     let seconds = 60;
     btn.disabled = true;
@@ -761,27 +738,19 @@ const DlgAuth = {
     }, 1000);
   }
 };
-
-// 打开登录弹窗
 $('#btnUser').onclick = () => {
-  // 清空所有输入框
   $('#login_em').value = ''; $('#login_pw').value = '';
   $('#reg_em').value = ''; $('#reg_pw').value = ''; $('#reg_code').value = '';
   $('#reset_em').value = ''; $('#reset_code').value = ''; $('#reset_pw').value = '';
   DlgAuth.show('login'); 
 };
-
-// 弹窗内导航
 $('#btnAuthCancel').onclick = () => DlgAuth.hide();
 $('#btnRegCancel').onclick = () => DlgAuth.hide();
 $('#btnResetCancel').onclick = () => DlgAuth.hide();
-
 $('#btnGoReg').onclick = () => DlgAuth.switchView('register');
 $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
 $('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
 $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
-
-// 登出
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
   try {
@@ -791,46 +760,25 @@ $('#btnLogout').onclick = async () => {
     alert('登出失败: ' + e.message);
   }
 };
-
-// --- 【新增】注册流程 ---
 $('#btnSendRegCode').onclick = async () => {
   const btn = $('#btnSendRegCode');
   const email = $('#reg_em').value.trim();
-  if (!email) {
-    DlgAuth.showMsg('register', '请输入邮箱');
-    return;
-  }
-  btn.disabled = true;
-  DlgAuth.showMsg('register', '发送中...', false);
+  if (!email) { DlgAuth.showMsg('register', '请输入邮箱'); return; }
+  btn.disabled = true; DlgAuth.showMsg('register', '发送中...', false);
   try {
-    const data = await api('/api/register-send-code', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email })
-    });
+    const data = await api('/api/register-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
     DlgAuth.showMsg('register', data.message || '验证码已发送', false);
-    DlgAuth.startCountdown(btn); // 开始倒计时
+    DlgAuth.startCountdown(btn); 
   } catch (e) {
     DlgAuth.showMsg('register', e.message || '发送失败');
-    btn.disabled = false; // 发送失败，允许重试
+    btn.disabled = false; 
   }
 };
-
 $('#goReg').onclick = async () => {
-  const b = $('#goReg');
-  b.disabled = true;
-  DlgAuth.showMsg('register', '');
+  const b = $('#goReg'); b.disabled = true; DlgAuth.showMsg('register', '');
   try {
-    const email = $('#reg_em').value.trim();
-    const password = $('#reg_pw').value;
-    const code = $('#reg_code').value.trim();
-    
-    await api('/api/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password, code }) // 【修改】发送 code
-    });
-    
+    const email = $('#reg_em').value.trim(); const password = $('#reg_pw').value; const code = $('#reg_code').value.trim();
+    await api('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password, code }) });
     DlgAuth.showMsg('register', '注册成功，请返回登录', false);
   } catch (e) {
     DlgAuth.showMsg('register', e.message || '注册失败');
@@ -838,52 +786,28 @@ $('#goReg').onclick = async () => {
     b.disabled = false;
   }
 };
-
-// --- 【修改】登录流程 ---
 $('#goLogin').onclick = async () => {
-  const b = $('#goLogin');
-  b.disabled = true;
-  DlgAuth.showMsg('login', '');
+  const b = $('#goLogin'); b.disabled = true; DlgAuth.showMsg('login', '');
   try {
-    await api('/api/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        email: $('#login_em').value.trim(),
-        password: $('#login_pw').value
-      })
-    });
+    await api('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('#login_em').value.trim(), password: $('#login_pw').value }) });
     const me = await api('/api/me');
     ONLINE = true;
     $('#btnUser').textContent = me.email;
     $('#btnLogout').style.display = 'inline-block';
     DlgAuth.hide();
-    
     await loadCloudItems();
-
   } catch (e) {
     DlgAuth.showMsg('login', e.message || '登录失败');
   } finally {
     b.disabled = false;
   }
 };
-
-// --- 【新增】重置密码流程 ---
 $('#btnSendResetCode').onclick = async () => {
-  const btn = $('#btnSendResetCode');
-  const email = $('#reset_em').value.trim();
-  if (!email) {
-    DlgAuth.showMsg('reset', '请输入注册邮箱');
-    return;
-  }
-  btn.disabled = true;
-  DlgAuth.showMsg('reset', '发送中...', false);
+  const btn = $('#btnSendResetCode'); const email = $('#reset_em').value.trim();
+  if (!email) { DlgAuth.showMsg('reset', '请输入注册邮箱'); return; }
+  btn.disabled = true; DlgAuth.showMsg('reset', '发送中...', false);
   try {
-    const data = await api('/api/password-reset-send-code', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email })
-    });
+    const data = await api('/api/password-reset-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
     DlgAuth.showMsg('reset', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn);
   } catch (e) {
@@ -891,22 +815,11 @@ $('#btnSendResetCode').onclick = async () => {
     btn.disabled = false;
   }
 };
-
 $('#goReset').onclick = async () => {
-  const b = $('#goReset');
-  b.disabled = true;
-  DlgAuth.showMsg('reset', '');
+  const b = $('#goReset'); b.disabled = true; DlgAuth.showMsg('reset', '');
   try {
-    const email = $('#reset_em').value.trim();
-    const code = $('#reset_code').value.trim();
-    const newPassword = $('#reset_pw').value;
-
-    await api('/api/password-reset-confirm', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, code, newPassword })
-    });
-    
+    const email = $('#reset_em').value.trim(); const code = $('#reset_code').value.trim(); const newPassword = $('#reset_pw').value;
+    await api('/api/password-reset-confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, code, newPassword }) });
     DlgAuth.showMsg('reset', '密码重置成功，请返回登录', false);
   } catch (e) {
     DlgAuth.showMsg('reset', e.message || '重置失败');
@@ -914,8 +827,7 @@ $('#goReset').onclick = async () => {
     b.disabled = false;
   }
 };
-
-
+// --- (loadCloudItems 和 checkLogin 保持不变) ---
 async function loadCloudItems() {
   try {
     allCloudItems = await api('/api/items'); 
@@ -929,8 +841,6 @@ async function loadCloudItems() {
     alert('加载数据失败: ' + e.message);
   }
 }
-
-// --- 【修改】checkLogin ---
 async function checkLogin() {
   try {
     const me = await api('/api/me');
@@ -949,6 +859,59 @@ function bootstrap(){
   checkLogin(); 
 }
 bootstrap();
+
+// --- 【修改 3】: 新增 "Profile" 保存 (滚动位置) ---
+let scrollTimer = null;
+const gridContainer = $('#gridContainer'); // 引用新 ID
+
+gridContainer.onscroll = () => {
+  if (!ONLINE || !activeId) return; // 仅在登录且有选中项时
+  clearTimeout(scrollTimer);
+  // 使用 1 秒的防抖 (debounce)，防止频繁写入
+  scrollTimer = setTimeout(saveScrollProfile, 1000); 
+};
+
+async function saveScrollProfile() {
+  if (!ONLINE || !activeId) return; // 再次检查
+
+  const scrollLeft = gridContainer.scrollLeft;
+  let targetCell = null;
+  
+  // 查找第一个其*中心点*在滚动条左侧或之后（>=）的单元格
+  const cells = $$('#gridHead .cell');
+  targetCell = cells.find(cell => {
+    return (cell.offsetLeft + (cell.clientWidth / 2)) >= scrollLeft;
+  });
+
+  // 如果找不到（例如滚动到了最后），则使用最后一个单元格
+  if (!targetCell && cells.length > 0) {
+    targetCell = cells[cells.length - 1];
+  }
+
+  if (!targetCell) return; // 没有单元格，不执行任何操作
+
+  const displayStartMonth = targetCell.dataset.ym; // e.g., "2027-07"
+  if (!displayStartMonth) return;
+
+  const activeItem = allCloudItems.find(it => it.id === activeId);
+  
+  // 仅当 profile 变化时才保存，防止不必要的 API 请求
+  if (activeItem && activeItem.displayStartMonth !== displayStartMonth) {
+    activeItem.displayStartMonth = displayStartMonth; // 1. 更新本地数据
+    try {
+      // 2. 更新服务器 (不阻塞 UI)
+      api('/api/items?id=' + activeId, {
+        method: 'PUT',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify({ displayStartMonth: displayStartMonth })
+      });
+    } catch (e) {
+      console.warn('保存滚动位置失败: ' + e.message);
+    }
+  }
+}
+// --- 【新增】结束 ---
+
 </script>
 
 </body></html>
