@@ -35,9 +35,29 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;height:var(--row-h);gap:8px;margin-bottom:8px;cursor:grab}
 .item:active { cursor: grabbing; }
 .item.active{outline:2px solid var(--brand)} 
+
+/* 【新增】允许项目信息的容器收缩，防止挤压按钮 */
+.item > div:first-child {
+  min-width: 0;
+}
+
 .item-line-1 { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .item-line-1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.item-line-1 .item-number { margin-left: auto; flex-shrink: 0; font-size: 12px; color: var(--muted); }
+
+/* 【修改】允许编号收缩和截断 */
+.item-line-1 .item-number { 
+  margin-left: auto; 
+  flex-shrink: 1;     /* 允许编号收缩 */
+  font-size: 12px; 
+  color: var(--muted); 
+  
+  /* 为过长的编号添加 "..." 省略号 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px; /* 编号超过 120px 宽度时开始截断 */
+}
+
 .item-line-2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .item-line-3 { font-size: 12px; margin-top: 2px; }
 
@@ -49,9 +69,7 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } 
 .badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } 
 
-/* 【修改】删除了 .today-line */
-
-/* 【新增】当月背景色 */
+/* 【修改】当月背景色 */
 .cell.today-month {
   background-color: #eef5ff; /* 浅蓝色 */
   border-color: #dbe8ff;
@@ -176,7 +194,14 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       
     </div>
     <div id="blockWarranty" style="display:none;margin-top:8px"><label class="small">保修期（月）</label><input id="f_wm" type="number" min="0" value="24" style="width:120px"/></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="btnCancel" class="ghost" type="button">取消</button><button id="btnSave" class="primary" type="button">保存</button></div>
+    
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px">
+      <button id="btnDeleteInDialog" class="ghost" type="button" style="color: #d93025; background: #fff0f0; border-color: #f5c6cb; display: none;">删除</button>
+      <div>
+        <button id="btnCancel" class="ghost" type="button">取消</button>
+        <button id="btnSave" class="primary" type="button">保存</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -249,12 +274,10 @@ let items = [];
 let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
 
-// --- 【新增】工具函数 ---
 function pad2(n){return (n<10?'0':'')+n;} 
 function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} 
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
 function MaxDate(d1, d2) { return d1 > d2 ? d1 : d2; }
-// --- 结束 ---
 
 function syncTypeUI(){ 
   const t=$('#f_type').value; 
@@ -270,19 +293,12 @@ $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCanc
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
-  
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
-  
   if(type==='warranty'){
-    return {
-      id:editingId||undefined, ...base,
-      warrantyMonths:Number($('#f_wm').value)||0
-    }
+    return { id:editingId||undefined, ...base, warrantyMonths:Number($('#f_wm').value)||0 }
   } 
-  
   const phases=[...$$('#phaseList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1,amount:Number(r.querySelector('input.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth); 
   const cancels=[...$$('#cancelList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); 
-  
   return {
     id:editingId||undefined, ...base,
     billingDay:Number($('#f_bill').value)||1,
@@ -312,7 +328,7 @@ function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.s
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
-// 【修改】滚动到 "今天" 的辅助函数 - 改为滚动到左侧
+// 【修改】滚动到 "今天" 的辅助函数 - 滚动到左侧
 function scrollToToday(behavior = 'smooth') {
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
@@ -320,10 +336,9 @@ function scrollToToday(behavior = 'smooth') {
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
-    // 【修改】滚动到最左侧, 留 10px 边距
+    // 滚动到最左侧, 留 10px 边距
     const targetScroll = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
     gridContainer.scrollTo({ left: Math.max(0, targetScroll), behavior: behavior });
-    
   } else {
     console.warn('Today is not in the rendered range.');
   }
@@ -371,6 +386,7 @@ function render(){
       if (termStr) subDetail = `<span class="small" style="color:#10b981">保期 ${termStr}</span>`;
     }
 
+    // 【修改】删除了 "删除" 按钮
     return `<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}">
       <div>
         <div class="title item-line-1">
@@ -386,24 +402,23 @@ function render(){
       </div>
       <div class="ops">
         <button class="ghost btnEdit" data-id="${it.id}" type="button">编辑</button>
-        <button class="ghost btnDel" data-id="${it.id}" type="button">删除</button>
       </div>
     </div>`;
   }).join(''); 
   
   L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
-  L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=allCloudItems.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); 
-  L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ 
+  
+  // 【修改】btnEdit 的 .onclick - 需要显示弹窗中的 "删除" 按钮
+  L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{
     e.stopPropagation(); 
-    if(!confirm('确定删除该项目？'))return; 
-    const id=b.dataset.id;
-    try {
-      await api('/api/items?id=' + id, { method: 'DELETE' }); 
-      await loadCloudItems(); 
-    } catch (err) {
-      alert('删除失败: ' + err.message);
-    }
+    const it=allCloudItems.find(x=>x.id===b.dataset.id); 
+    editingId=it.id; 
+    fillForm(it); 
+    $('#dlgTitle').textContent='编辑项目'; 
+    $('#btnDeleteInDialog').style.display = 'inline-block'; // <-- 【新增】显示删除按钮
+    $('#dlg').style.display='flex';
   }); 
+  // 【修改】旧的 .btnDel 逻辑已移除
   
   // --- 3. 渲染右侧时间轴 ---
   const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); 
@@ -475,7 +490,6 @@ function render(){
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
     const totalCols = daysInMonth + 2; 
-    // 【修改】删除了 lineCol
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
 
     // 【修改】添加 'today-month' class, 移除 today-line
@@ -501,11 +515,9 @@ function render(){
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
     const totalCols = daysInMonth + 2; 
-    // 【修改】删除了 lineCol
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
     const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
     const contentDivEnd = `</div>`;
-    // 【修改】删除了 todayLine
 
     if(it.type==='warranty'){ 
       const warrantyMonths = Number(it.warrantyMonths || 0);
@@ -585,10 +597,23 @@ function render(){
   });
   
   setTimeout(() => {
-    scrollToToday('auto'); // 'auto' for instant scroll
+    scrollToToday('auto'); 
   }, 0);
 }
-$('#f_type').onchange=syncTypeUI; $('#btnAdd').onclick=()=>{ editingId=null; fillForm(null); $('#dlgTitle').textContent='新增项目'; $('#dlg').style.display='flex'; }; $('#btnClose').onclick=()=>$('#dlg').style.display='none'; $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
+$('#f_type').onchange=syncTypeUI; 
+
+// 【修改】btnAdd.onclick - "新增" 时隐藏弹窗的 "删除" 按钮
+$('#btnAdd').onclick=()=>{ 
+  editingId=null; 
+  fillForm(null); 
+  $('#dlgTitle').textContent='新增项目'; 
+  $('#btnDeleteInDialog').style.display = 'none'; // <-- 【新增】隐藏删除按钮
+  $('#dlg').style.display='flex'; 
+}; 
+
+$('#btnClose').onclick=()=>$('#dlg').style.display='none'; 
+$('#btnCancel').onclick=()=>$('#dlg').style.display='none'; 
+$('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
 
 $('#btnSave').onclick= async ()=>{ 
   const it = readForm(); 
@@ -619,11 +644,27 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
+// 【新增】弹窗中 "删除" 按钮的逻辑
+$('#btnDeleteInDialog').onclick = async () => {
+  if (!editingId) return; // 安全检查
+  if (!confirm('确定要删除该项目吗？此操作无法撤销。')) return;
+
+  const b = $('#btnDeleteInDialog');
+  b.disabled = true;
+  try {
+    await api('/api/items?id=' + editingId, { method: 'DELETE' });
+    $('#dlg').style.display='none'; // 关闭弹窗
+    await loadCloudItems(); // 重新加载列表
+  } catch (e) {
+    alert('删除失败: ' + e.message);
+  } finally {
+    b.disabled = false;
+  }
+};
+
 $('#btnToday').onclick = async () => {
   scrollToToday('smooth');
 };
-
-// 【删除】"显示" 按钮 (btnRenderMonths) 的逻辑已移除
 
 $('#btnSearch').onclick = () => render();
 $('#btnClearSearch').onclick = () => {
