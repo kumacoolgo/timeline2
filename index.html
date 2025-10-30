@@ -56,16 +56,20 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 /* --- 新增结束 --- */
 
 
-/* 【新增】“今天”竖线样式 */
-.cell.today::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%; /* 居中 */
-  width: 2px; /* 竖线宽度 */
-  background-color: var(--brand); /* 品牌蓝色 */
+/* 【修改】“今天”竖线样式 - 移除 ::before */
+/* .cell.today::before { ... } */
+/* --- 修改结束 --- */
+
+/* 【新增】新的基于 Grid 的“今天”竖线样式 */
+.today-line {
+  position: relative; /* 作为一个 grid item */
+  grid-row: 1; /* 确保在第一行 */
+  height: 100%;
+  width: 2px;
+  background-color: var(--brand);
+  transform: translateX(-50%); /* 将 2px 宽的线在 grid 线上居中 */
   z-index: 10;
+  pointer-events: none; /* 防止遮挡内容 */
 }
 /* --- 新增结束 --- */
 
@@ -381,16 +385,34 @@ function render(){
   const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
-  // 【新增】获取今天的年月，用于标记
+  // 【修改】获取今天的年月日
   const today = new Date();
-  const todayYm = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
-  // --- 新增结束 ---
+  const todayY = today.getFullYear();
+  const todayM = today.getMonth();
+  const todayD = today.getDate();
+  // --- 修改结束 ---
 
   head.innerHTML=mlist.map(m=>{
     const q=Math.ceil((m.getMonth()+1)/3); 
     const ym = `${m.getFullYear()}-${pad2(m.getMonth() + 1)}`;
-    // 【修改】添加 today 样式类
-    return `<div class="cell nowrap ${ym === todayYm ? 'today' : ''}" data-ym="${ym}" style="text-align:center"><div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div><div class=small>Q${q}</div></div>`
+    
+    // 【修改】为 "today" 竖线准备 grid
+    const mYear = m.getFullYear();
+    const mMonth = m.getMonth();
+    const isTodayMonth = mYear === todayY && mMonth === todayM;
+    const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
+    const totalCols = daysInMonth + 2; // 按要求 +2
+    const lineCol = isTodayMonth ? (todayD + 1) : -1; // 1号在第2列, 30号在第31列
+    
+    const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
+
+    return `<div class="cell nowrap" data-ym="${ym}" style="text-align:center; ${gridStyle}">
+      <div style="grid-column: 1 / -1; z-index: 5;">
+        <div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div>
+        <div class=small>Q${q}</div>
+      </div>
+      ${isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : ''}
+    </div>`;
   }).join(''); 
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
@@ -402,19 +424,40 @@ function render(){
   const cells=[]; 
   for(let i=0;i<mlist.length;i++){ 
     const idx=MonthIndex(mlist[i]); 
+    
+    // 【修改】为 "today" 竖线准备 grid
+    const m = mlist[i];
+    const mYear = m.getFullYear();
+    const mMonth = m.getMonth();
+    const isTodayMonth = mYear === todayY && mMonth === todayM;
+    const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
+    const totalCols = daysInMonth + 2; // 按要求 +2
+    const lineCol = isTodayMonth ? (todayD + 1) : -1; // 1号在第2列, 30号在第31列
+    
+    const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
+    
+    // 内容层 (用于堆叠 badge)
+    const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
+    const contentDivEnd = `</div>`;
+    // 竖线层
+    const todayLine = isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : '';
+    // --- 修改结束 ---
+
     if(it.type==='warranty'){ 
       const inWar = idx>=1 && idx<= (Number(it.warrantyMonths||0)); 
-      // 【修改】添加 today 样式类
-      const ym = `${mlist[i].getFullYear()}-${pad2(mlist[i].getMonth() + 1)}`;
-      cells.push(`<div class="cell ${ym === todayYm ? 'today' : ''}" style="text-align:center">${inWar?'<span class=badge>保修中</span>':''}</div>`); 
+      cells.push(`<div class="cell" style="text-align:center; ${gridStyle}">
+        ${contentDivStart}
+          ${inWar?'<span class=badge>保修中</span>':''}
+        ${contentDivEnd}
+        ${todayLine}
+      </div>`); 
     }else{ 
       const amount=resolvePlanPrice(it.pricePhases,idx); 
       const cancel=isInCancel(it.cancelWindows,idx); 
 
-      // 【新增】计算金额段的交替背景色
       let amountBadgeClass = '';
       if (amount != null) {
-        const sortedPhases = it.pricePhases.filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
+        const sortedPhases = (it.pricePhases || []).filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
         let segmentIndex = 0;
         for (let j = 0; j < sortedPhases.length; j++) {
           if (idx >= sortedPhases[j].fromMonth) {
@@ -423,13 +466,13 @@ function render(){
         }
         amountBadgeClass = (segmentIndex % 2 === 0) ? 'amount-segment-1' : 'amount-segment-2';
       }
-      // --- 新增结束 ---
-
-      // 【修改】调整退会期和金额的顺序，并添加 today 样式类
-      const ym = `${mlist[i].getFullYear()}-${pad2(mlist[i].getMonth() + 1)}`;
-      cells.push(`<div class="cell ${ym === todayYm ? 'today' : ''}" style="text-align:center">
-        ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${amount.toLocaleString()}</div>`:''}
-        ${cancel?'<div class="badge cancel">退会期</div>':''}
+      
+      cells.push(`<div class="cell" style="text-align:center; ${gridStyle}">
+        ${contentDivStart}
+          ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${amount.toLocaleString()}</div>`:''}
+          ${cancel?'<div class="badge cancel">退会期</div>':''}
+        ${contentDivEnd}
+        ${todayLine}
       </div>`); 
     } 
   } 
@@ -503,25 +546,33 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
+// 【修改】"跳到今天" 按钮逻辑
 $('#btnToday').onclick=()=>{
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
   const gridContainer = $('#grid').parentElement;
   
-  // 查找今天所在的月份单元格
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
-    // 滚动到今天所在月份的头部单元格
+    // 查找今天所在的竖线
+    const todayLine = todayCellHead.querySelector('.today-line');
+    let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10; // 默认滚动到单元格开头
+
+    if (todayLine) {
+      // 如果找到了竖线，精确计算滚动位置
+      // 目标：让竖线大致位于视口的 1/3 处或中央
+      const lineLeftInCell = todayLine.offsetLeft;
+      const targetScroll = todayCellHead.offsetLeft + lineLeftInCell - (gridContainer.clientWidth / 3);
+      scrollLeft = Math.max(0, targetScroll); // 防止滚动到负数
+    }
+    
     gridContainer.scrollTo({
-      left: todayCellHead.offsetLeft - gridContainer.offsetLeft - 10, 
+      left: scrollLeft, 
       behavior: 'smooth'
     });
   } else {
-    // 如果今天不在当前显示的月份范围内，重新渲染以包含今天
     alert('今天不在当前显示的时间范围内，将重新渲染时间轴。');
-    // 可以考虑调整 `months` 的值或 `minStart` 来确保今天显示
-    // 但此处为了简化，仅提示
     render(); 
   }
 };
@@ -591,7 +642,6 @@ $('#goLogin').onclick = async ()=>{
 async function loadCloudItems() {
   try {
     allCloudItems = await api('/api/items'); 
-    // 确保 allCloudItems 按照 order 字段排序
     allCloudItems.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     if (allCloudItems.length > 0 && !allCloudItems.find(it => it.id === activeId)) {
