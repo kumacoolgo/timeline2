@@ -53,7 +53,15 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 #panel{width:min(680px,92vw); max-height:92vh; overflow:auto;background:#fff;border-radius:14px;padding:14px; box-shadow:0 12px 32px rgba(0,0,0,.18)}
 fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:6px}
 fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:8px;align-items:center;margin:6px 0}
-.row-fields input{width:120px} .row-fields .m{width:80px} .row-fields .a{width:120px}
+
+/* --- 【修改】调整了 input 宽度 --- */
+.row-fields input{width:100px} 
+.row-fields .m{width:60px}   /* 金额段-月 */
+.row-fields .a{width:80px}   /* 金额段-金额 */
+.row-fields .fm{width:60px}  /* 退会期-开始月 */
+.row-fields .tm{width:60px}  /* 退会期-结束月 */
+/* --- 修改结束 --- */
+
 
 /* --- 【新】添加的图标按钮样式 --- */
 .icon-btn {
@@ -94,6 +102,11 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 @media (max-width: 860px){
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
+  /* --- 【修改】强制金额段和退会期行不换行 --- */
+  #phaseList .row-fields,
+  #cancelList .row-fields {
+    flex-wrap: nowrap;
+  }
   #leftWrap { max-height: 25vh; }
 }
 </style>
@@ -141,9 +154,13 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h3 id="dlgTitle">编辑项目</h3><button id="btnClose" class="ghost">×</button>
     </div>
+    
     <div class="row" style="gap:10px">
       <select id="f_type"><option value="plan">套餐</option><option value="warranty">保修</option><option value="insurance">保险</option></select>
-      <input id="f_name" placeholder="项目名称"/><input id="f_number" placeholder="编号/卡号(可选)" style="width:160px"/><input id="f_start" type="date"/>
+      <input id="f_name" placeholder="项目名称"/>
+      <input id="f_number" placeholder="编号/卡号(可选)" style="width:160px"/>
+      <label class="small" for="f_start" style="margin-left: 5px;">开始日</label>
+      <input id="f_start" type="date" style="width: 130px;"/>
     </div>
     <div id="blockPlan">
       <div class="row" style="margin-top:6px"><label class="small">出账日</label><input id="f_bill" type="number" min="1" max="28" value="1" style="width:80px"/></div>
@@ -205,7 +222,7 @@ function syncTypeUI(){
   $('#subBlockInsurance').style.display=(t==='insurance')?'block':'none';
 }
 
-// 【修改】JS 中动态生成的按钮已改为图标
+// 【JS 未修改】JS 函数已正确，CSS 负责处理布局
 function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>日元/月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
