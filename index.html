@@ -33,9 +33,14 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
     padding-right: 6px; /* 预留滚动条空间 */
   }
 }
-@media (max-width: 860px){
+/* 【注意】
+  此处 @media (max-width: 860px) 的 #leftWrap 样式
+  被文件末尾的 @media (max-width: 860px) 覆盖，
+  所以我们去修改末尾的那个规则。
+*/
+/* @media (max-width: 860px){
   #leftWrap { max-height: 25vh; }
-}
+} */
 
 .item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;height:var(--row-h);gap:8px;margin-bottom:8px;cursor:grab}
 .item:active { cursor: grabbing; }
@@ -145,7 +150,14 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   #cancelList .row-fields {
     flex-wrap: nowrap;
   }
-  #leftWrap { max-height: 25vh; }
+  
+  /* --- 【修改】为移动端添加 overflow-y: auto; --- */
+  #leftWrap { 
+    max-height: 25vh; 
+    overflow-y: auto;
+    padding-right: 6px; /* 预留滚动条空间 */
+  }
+  /* --- 修改结束 --- */
 }
 </style>
 </head>
