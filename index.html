@@ -422,7 +422,19 @@ function render(){
     </div>`;
   }).join(''); 
   
-  L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
+  // 【【【【BUG 修复】】】】
+  // 将 clearTimeout 添加到 onclick 处理器中
+  // 这样可以在切换项目时立即取消任何待处理的滚动保存
+  L.querySelectorAll('.item').forEach(div=>{ 
+    const id=div.dataset.id; 
+    div.onclick=e=>{ 
+      if(e.target.closest('button')) return; 
+      clearTimeout(scrollTimer); // <-- 【修复】立即取消待处理的保存
+      activeId=id; 
+      render(); 
+    }; 
+  }); 
+
   L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=allCloudItems.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); 
   L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ 
     e.stopPropagation(); 
@@ -955,8 +967,6 @@ async function saveScrollProfile(itemId, monthToSave) {
   if (activeItem && activeItem.displayStartMonth !== monthToSave) {
     activeItem.displayStartMonth = monthToSave; 
     try {
-      // 【【【【修复 TYPO】】】】
-      // 删除了上一版中多余的 'G'
       await api('/api/items?id=' + itemId, { 
         method: 'PUT',
         headers: {'content-type': 'application/json'},
