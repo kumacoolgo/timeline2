@@ -132,6 +132,19 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     padding-right: 6px; /* 预留滚动条空间 */
   }
 }
+
+/* 【新增】认证弹窗样式 */
+#dlgAuth .auth-view { display: none; }
+#dlgAuth .auth-view.active { display: block; }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  text-align: left;
+}
 </style>
 </head>
 <body>
@@ -226,12 +239,60 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 
 <div id="dlgAuth" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;z-index:9999">
   <div class="card" style="width:min(520px,92vw);padding:14px">
-    <h3>登录 / 注册</h3>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <input id="em" placeholder="邮箱"/><input id="pw" type="password" placeholder="密码（≥8位）"/>
-      <div id="msg" class="small" style="color:#ef4444"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button id="btnAuthCancel" class="ghost" type="button">取消</button><button id="goReg" class="ghost" type="button">注册</button><button id="goLogin" class="primary" type="button">登录</button></div>
+    
+    <div id="viewLogin" class="auth-view active">
+      <h3>登录</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="login_em" placeholder="邮箱"/>
+        <input id="login_pw" type="password" placeholder="密码"/>
+        <div id="login_msg" class="small" style="color:#ef4444"></div>
+        <div class="row" style="justify-content: space-between;">
+          <button class="link-btn" id="btnGoReset" type="button">忘记密码？</button>
+          <div>
+            <button id="btnAuthCancel" class="ghost" type="button">取消</button>
+            <button id="btnGoReg" class="ghost" type="button">注册</button>
+            <button id="goLogin" class="primary" type="button">登录</button>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <div id="viewRegister" class="auth-view">
+      <h3>注册</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="reg_em" placeholder="邮箱"/>
+        <input id="reg_pw" type="password" placeholder="密码（≥8位）"/>
+        <div class="row" style="gap: 8px;">
+          <input id="reg_code" placeholder="6位验证码" style="flex: 1; min-width: 0;"/>
+          <button id="btnSendRegCode" class="ghost" type="button">发送验证码</button>
+        </div>
+        <div id="reg_msg" class="small" style="color:#ef4444"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="btnRegCancel" class="ghost" type="button">取消</button>
+          <button id="btnGoLogin" class="ghost" type="button">返回登录</button>
+          <button id="goReg" class="primary" type="button">确认注册</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="viewReset" class="auth-view">
+      <h3>重置密码</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="reset_em" placeholder="注册邮箱"/>
+        <div class="row" style="gap: 8px;">
+          <input id="reset_code" placeholder="6位验证码" style="flex: 1; min-width: 0;"/>
+          <button id="btnSendResetCode" class="ghost" type="button">发送验证码</button>
+        </div>
+        <input id="reset_pw" type="password" placeholder="新密码（≥8位）"/>
+        <div id="reset_msg" class="small" style="color:#ef4444"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="btnResetCancel" class="ghost" type="button">取消</button>
+          <button id="btnGoLoginReset" class="ghost" type="button">返回登录</button>
+          <button id="goReset" class="primary" type="button">确认重置</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -296,7 +357,6 @@ function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMo
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
 function render(){ 
-  // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
   if (!term) {
     items = [...allCloudItems]; 
@@ -310,9 +370,7 @@ function render(){
   if (!items.find(it => it.id === activeId)) {
     activeId = items[0]?.id || null;
   }
-  // --- 过滤结束 ---
 
-  // --- 2. 渲染左侧列表 ---
   const L=$('#leftWrap');
   if(sortableList) {
     sortableList.destroy();
@@ -338,7 +396,6 @@ function render(){
       if (termStr) subDetail = `<span class="small" style="color:#10b981">保期 ${termStr}</span>`;
     }
 
-    // 【修改】调整 HTML 布局，将 subDetail 移到新的 item-line-3
     return `<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}">
       <div>
         <div class="title item-line-1">
@@ -358,12 +415,9 @@ function render(){
       </div>
     </div>`;
   }).join(''); 
-  // --- 修改结束 ---
   
   L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
-  
   L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=allCloudItems.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); 
-  
   L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ 
     e.stopPropagation(); 
     if(!confirm('确定删除该项目？'))return; 
@@ -376,7 +430,6 @@ function render(){
     }
   }); 
   
-  // --- 3. 渲染右侧时间轴 ---
   const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); if(!data.length){ head.innerHTML=''; grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; return } 
   const months=Number($('#months').value)||24; 
   const minStart=startOfMonth(new Date(data[0].startDate||new Date())); const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
@@ -395,8 +448,8 @@ function render(){
     const mMonth = m.getMonth();
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-    const totalCols = daysInMonth + 2; // 按要求 +2
-    const lineCol = isTodayMonth ? (todayD + 1) : -1; // 1号在第2列, 30号在第31列
+    const totalCols = daysInMonth + 2; 
+    const lineCol = isTodayMonth ? (todayD + 1) : -1;
     
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
 
@@ -412,27 +465,21 @@ function render(){
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   const it=data[0]; 
   const m0=startOfMonth(new Date(it.startDate)); 
-  
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
   
   const cells=[]; 
   for(let i=0;i<mlist.length;i++){ 
     const idx=MonthIndex(mlist[i]); 
-    
     const m = mlist[i];
     const mYear = m.getFullYear();
     const mMonth = m.getMonth();
     const isTodayMonth = mYear === todayY && mMonth === todayM;
     const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-    const totalCols = daysInMonth + 2; // 按要求 +2
-    const lineCol = isTodayMonth ? (todayD + 1) : -1; // 1号在第2列, 30号在第31列
-    
+    const totalCols = daysInMonth + 2; 
+    const lineCol = isTodayMonth ? (todayD + 1) : -1;
     const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
-    
-    // 内容层 (用于堆叠 badge)
     const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
     const contentDivEnd = `</div>`;
-    // 竖线层
     const todayLine = isTodayMonth ? `<div class="today-line" style="grid-column: ${lineCol};"></div>` : '';
 
     if(it.type==='warranty'){ 
@@ -470,7 +517,6 @@ function render(){
   } 
   grid.innerHTML=cells.join(''); 
 
-  // --- 4. 初始化拖拽排序 ---
   sortableList = new Sortable(L, {
     animation: 150,
     handle: '.item', 
@@ -542,18 +588,16 @@ $('#btnToday').onclick=()=>{
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
   const gridContainer = $('#grid').parentElement;
-  
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
-    // 查找今天所在的竖线
     const todayLine = todayCellHead.querySelector('.today-line');
-    let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10; // 默认滚动到单元格开头
+    let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10; 
 
     if (todayLine) {
       const lineLeftInCell = todayLine.offsetLeft;
       const targetScroll = todayCellHead.offsetLeft + lineLeftInCell - (gridContainer.clientWidth / 3);
-      scrollLeft = Math.max(0, targetScroll); // 防止滚动到负数
+      scrollLeft = Math.max(0, targetScroll); 
     }
     
     gridContainer.scrollTo({
@@ -574,16 +618,19 @@ $('#btnClearSearch').onclick = () => {
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
+// --- 【修改】认证 API ---
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
   let data; try{ data = JSON.parse(text||'{}') }catch{ data = { error:text||'网络错误' } }
   if(!r.ok){
-    if (r.status === 401 && path !== '/api/login' && path !== '/api/register') {
+    // 【修改】API 路径检查中加入新的 API
+    const isAuthPath = ['/api/login', '/api/register', '/api/register-send-code', '/api/password-reset-send-code', '/api/password-reset-confirm'].includes(path);
+    if (r.status === 401 && !isAuthPath) {
       ONLINE = false;
       $('#btnUser').textContent = '登录/注册';
       $('#btnLogout').style.display = 'none';
-      $('#dlgAuth').style.display = 'flex';
+      DlgAuth.show('login'); // 【修改】调用 DlgAuth.show()
     }
     const msg = data.reason ? `${data.error} (${data.reason})` : (data.error || `HTTP ${r.status}`);
     throw new Error(msg);
@@ -591,9 +638,83 @@ async function api(path, init){
   return data;
 }
 
-$('#btnUser').onclick=()=>{ $('#em').value=''; $('#pw').value=''; $('#msg').textContent=''; $('#dlgAuth').style.display='flex'; }; 
-$('#btnAuthCancel').onclick=()=>$('#dlgAuth').style.display='none';
+// --- 【新增/修改】认证弹窗逻辑 ---
+const DlgAuth = {
+  el: $('#dlgAuth'),
+  views: {
+    login: $('#viewLogin'),
+    register: $('#viewRegister'),
+    reset: $('#viewReset'),
+  },
+  msgs: {
+    login: $('#login_msg'),
+    register: $('#reg_msg'),
+    reset: $('#reset_msg'),
+  },
+  
+  show(viewName = 'login') {
+    this.switchView(viewName);
+    this.el.style.display = 'flex';
+  },
+  
+  hide() {
+    this.el.style.display = 'none';
+  },
+  
+  switchView(viewName) {
+    Object.values(this.views).forEach(v => v.classList.remove('active'));
+    Object.values(this.msgs).forEach(m => m.textContent = '');
+    if (this.views[viewName]) {
+      this.views[viewName].classList.add('active');
+    }
+  },
+  
+  showMsg(view, message, isError = true) {
+    if (this.msgs[view]) {
+      this.msgs[view].textContent = message;
+      this.msgs[view].style.color = isError ? '#ef4444' : '#16a34a';
+    }
+  },
+  
+  // 倒计时
+  startCountdown(btn) {
+    let seconds = 60;
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = `重新发送 (${seconds}s)`;
+    const interval = setInterval(() => {
+      seconds--;
+      if (seconds <= 0) {
+        clearInterval(interval);
+        btn.textContent = originalText;
+        btn.disabled = false;
+      } else {
+        btn.textContent = `重新发送 (${seconds}s)`;
+      }
+    }, 1000);
+  }
+};
 
+// 打开登录弹窗
+$('#btnUser').onclick = () => {
+  // 清空所有输入框
+  $('#login_em').value = ''; $('#login_pw').value = '';
+  $('#reg_em').value = ''; $('#reg_pw').value = ''; $('#reg_code').value = '';
+  $('#reset_em').value = ''; $('#reset_code').value = ''; $('#reset_pw').value = '';
+  DlgAuth.show('login'); 
+};
+
+// 弹窗内导航
+$('#btnAuthCancel').onclick = () => DlgAuth.hide();
+$('#btnRegCancel').onclick = () => DlgAuth.hide();
+$('#btnResetCancel').onclick = () => DlgAuth.hide();
+
+$('#btnGoReg').onclick = () => DlgAuth.switchView('register');
+$('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
+$('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
+$('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
+
+// 登出
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
   try {
@@ -604,29 +725,129 @@ $('#btnLogout').onclick = async () => {
   }
 };
 
-$('#goReg').onclick=async()=>{ const b=$('#goReg'); b.disabled=true; try{ await api('/api/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('#em').value.trim(), password:$('#pw').value})}); $('#msg').style.color='#16a34a'; $('#msg').textContent='注册成功，请点击登录'; }catch(e){ $('#msg').style.color='#ef4444'; $('#msg').textContent=e.message||'注册失败'; } finally{ b.disabled=false; } }
-
-$('#goLogin').onclick = async ()=>{
-  const b=$('#goLogin'); b.disabled=true;
-  try{
-    await api('/api/login',{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body: JSON.stringify({ email: $('#em').value.trim(), password: $('#pw').value })
+// --- 【新增】注册流程 ---
+$('#btnSendRegCode').onclick = async () => {
+  const btn = $('#btnSendRegCode');
+  const email = $('#reg_em').value.trim();
+  if (!email) {
+    DlgAuth.showMsg('register', '请输入邮箱');
+    return;
+  }
+  btn.disabled = true;
+  DlgAuth.showMsg('register', '发送中...', false);
+  try {
+    const data = await api('/api/register-send-code', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: email })
     });
-    const me = await api('/api/me'); 
-    ONLINE=true; 
-    $('#btnUser').textContent = me.email; 
-    $('#btnLogout').style.display = 'inline-block'; 
-    $('#dlgAuth').style.display='none';
-    
-    await loadCloudItems(); 
-
-  }catch(e){
-    $('#msg').style.color='#ef4444';
-    $('#msg').textContent = e.message || '登录失败';
-  }finally{ b.disabled=false; }
+    DlgAuth.showMsg('register', data.message || '验证码已发送', false);
+    DlgAuth.startCountdown(btn); // 开始倒计时
+  } catch (e) {
+    DlgAuth.showMsg('register', e.message || '发送失败');
+    btn.disabled = false; // 发送失败，允许重试
+  }
 };
+
+$('#goReg').onclick = async () => {
+  const b = $('#goReg');
+  b.disabled = true;
+  DlgAuth.showMsg('register', '');
+  try {
+    const email = $('#reg_em').value.trim();
+    const password = $('#reg_pw').value;
+    const code = $('#reg_code').value.trim();
+    
+    await api('/api/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password, code }) // 【修改】发送 code
+    });
+    
+    DlgAuth.showMsg('register', '注册成功，请返回登录', false);
+  } catch (e) {
+    DlgAuth.showMsg('register', e.message || '注册失败');
+  } finally {
+    b.disabled = false;
+  }
+};
+
+// --- 【修改】登录流程 ---
+$('#goLogin').onclick = async () => {
+  const b = $('#goLogin');
+  b.disabled = true;
+  DlgAuth.showMsg('login', '');
+  try {
+    await api('/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: $('#login_em').value.trim(),
+        password: $('#login_pw').value
+      })
+    });
+    const me = await api('/api/me');
+    ONLINE = true;
+    $('#btnUser').textContent = me.email;
+    $('#btnLogout').style.display = 'inline-block';
+    DlgAuth.hide();
+    
+    await loadCloudItems();
+
+  } catch (e) {
+    DlgAuth.showMsg('login', e.message || '登录失败');
+  } finally {
+    b.disabled = false;
+  }
+};
+
+// --- 【新增】重置密码流程 ---
+$('#btnSendResetCode').onclick = async () => {
+  const btn = $('#btnSendResetCode');
+  const email = $('#reset_em').value.trim();
+  if (!email) {
+    DlgAuth.showMsg('reset', '请输入注册邮箱');
+    return;
+  }
+  btn.disabled = true;
+  DlgAuth.showMsg('reset', '发送中...', false);
+  try {
+    const data = await api('/api/password-reset-send-code', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    });
+    DlgAuth.showMsg('reset', data.message || '验证码已发送', false);
+    DlgAuth.startCountdown(btn);
+  } catch (e) {
+    DlgAuth.showMsg('reset', e.message || '发送失败');
+    btn.disabled = false;
+  }
+};
+
+$('#goReset').onclick = async () => {
+  const b = $('#goReset');
+  b.disabled = true;
+  DlgAuth.showMsg('reset', '');
+  try {
+    const email = $('#reset_em').value.trim();
+    const code = $('#reset_code').value.trim();
+    const newPassword = $('#reset_pw').value;
+
+    await api('/api/password-reset-confirm', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, code, newPassword })
+    });
+    
+    DlgAuth.showMsg('reset', '密码重置成功，请返回登录', false);
+  } catch (e) {
+    DlgAuth.showMsg('reset', e.message || '重置失败');
+  } finally {
+    b.disabled = false;
+  }
+};
+
 
 async function loadCloudItems() {
   try {
@@ -642,6 +863,7 @@ async function loadCloudItems() {
   }
 }
 
+// --- 【修改】checkLogin ---
 async function checkLogin() {
   try {
     const me = await api('/api/me');
@@ -652,7 +874,7 @@ async function checkLogin() {
   } catch (e) {
     ONLINE = false;
     $('#btnUser').textContent = '登录/注册';
-    $('#dlgAuth').style.display = 'flex';
+    DlgAuth.show('login'); // 自动显示登录弹窗
   }
 }
 

@@ -1,8 +1,23 @@
-// api/_utils.js —— 关键片段
+// api/_utils.js
 const crypto = require('crypto');
 const UPSTASH_REDIS_REST_URL   = process.env.UPSTASH_REDIS_REST_URL   || process.env.UPSTASH_REST_URL;
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_REST_TOKEN;
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
+const VERIFY_CODE_TTL_SECONDS = 60 * 10; // 验证码10分钟有效期
+
+// --- 【重要】Resend 配置 ---
+// 1. 引入 Resend 库
+const { Resend } = require('resend');
+
+// 2. 从 Vercel 环境变量中安全地读取 Key 和发件人
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const EMAIL_FROM = process.env.EMAIL_FROM;
+
+// 3. 初始化 Resend 客户端
+//    如果环境变量没设置，resend 会是 null
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+// --- Resend 配置结束 ---
+
 
 function json(res, obj, code=200) {
   res.statusCode = code;
@@ -34,11 +49,8 @@ function setCookie(res, name, value, opt={}) {
   res.setHeader('set-cookie', a.join('; '));
 }
 
-// 统一用 pipeline 执行单条/多条命令，避免 /<cmd> 形态在某些集群上报错
 async function redis(cmd, ...args) {
-  // 把所有参数都转成字符串，避免意外多参数/类型问题
   const body = [[ String(cmd).toLowerCase(), ...args.map(v => String(v)) ]];
-
   const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
     method: 'POST',
     headers: {
@@ -47,21 +59,16 @@ async function redis(cmd, ...args) {
     },
     body: JSON.stringify(body)
   });
-
   const d = await r.json();
   if (!r.ok) throw new Error(d?.error || 'Upstash pipeline(s) failed');
-
-  // 单条命令的结果在第 0 个
   return d[0]?.result;
 }
 
 async function redisPipeline(commands) {
-  // commands 形如： [ ['set', key, value], ['get', key] ]
   const body = commands.map(([c, ...rest]) => [
     String(c).toLowerCase(),
     ...rest.map(v => String(v))
   ]);
-
   const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
     method: 'POST',
     headers: {
@@ -70,7 +77,6 @@ async function redisPipeline(commands) {
     },
     body: JSON.stringify(body)
   });
-
   const d = await r.json();
   if (!r.ok) throw new Error(d?.error || 'Upstash pipeline failed');
   return d.map(x => x.result);
@@ -79,6 +85,48 @@ async function redisPipeline(commands) {
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
 function uid(){ return crypto.randomBytes(16).toString('hex'); }
 function genSalt(){ return crypto.randomBytes(16).toString('hex'); }
+
+// 【新增】生成6位随机数字码
+function genVerifyCode() {
+  return crypto.randomInt(100000, 999999).toString();
+}
+
+// 【新增】发送验证邮件 (Resend 真实实现)
+async function sendVerificationEmail(toEmail, code, subject = '您的验证码') {
+  
+  // 检查 Resend 客户端和发件人邮箱是否已在 Vercel 中配置
+  // 这会检查 process.env.RESEND_API_KEY 和 process.env.EMAIL_FROM
+  if (!resend || !EMAIL_FROM) {
+    console.error('RESEND_API_KEY 或 EMAIL_FROM 未在环境变量中配置');
+    
+    // 在开发环境中，我们回退到打印日志，方便测试
+    if (process.env.VERCEL_ENV !== 'production') {
+      console.log(`=== 邮件模拟发送 (服务未配置) ===`);
+      console.log(`TO: ${toEmail}`);
+      console.log(`SUBJECT: ${subject}`);
+      console.log(`CODE: ${code}`);
+      console.log(`=================================`);
+      return; // 开发环境假装发送成功
+    }
+    
+    // 生产环境中必须报错
+    throw new Error('邮件服务未正确配置');
+  }
+  
+  try {
+    // 使用 Resend 发送邮件
+    await resend.emails.send({
+      from: EMAIL_FROM, // 从 Vercel 环境变量读取的发件人
+      to: toEmail,
+      subject: subject,
+      html: `<p>您的验证码是：<b>${code}</b></p><p>该验证码10分钟内有效。</p>`,
+    });
+  } catch (error) {
+    console.error('Resend 邮件发送失败:', error);
+    throw new Error('邮件发送失败，请稍后重试');
+  }
+}
+
 
 const ITER=210000, KEYLEN=32, DIGEST='sha256';
 function hashPassword(pw, s) {
@@ -137,5 +185,10 @@ module.exports = {
   redis, redisPipeline,
   normEmail, uid, genSalt, hashPassword, verifyPassword,
   getUserByEmail, createUser, createSession, getUserIdBySession,
-  TTL: TTL_DAYS, destroySession
+  TTL: TTL_DAYS, destroySession,
+  
+  // 【新增】导出的模块
+  genVerifyCode,
+  sendVerificationEmail,
+  VERIFY_CODE_TTL_SECONDS,
 };
