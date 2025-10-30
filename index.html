@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>费用时间轴</title>
 <style>
-:root{--brand:#3b82f6;--muted:#667085;--card:#ffffff;--line:#eef0f3;--pill:#f1f5ff;--row-h:56px;--col-w:110px;--radius:14px}
+/* 【修改】增加行高以容纳三行 */
+:root{--brand:#3b82f6;--muted:#667085;--card:#ffffff;--line:#eef0f3;--pill:#f1f5ff;--row-h:72px;--col-w:110px;--radius:14px}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#f6f8fb;color:#0f172a;font:14px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial}
 button{border:0;border-radius:10px;background:#111827;color:#fff;padding:8px 12px;cursor:pointer}
@@ -29,7 +30,20 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .item-line-1 { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .item-line-1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .item-line-1 .item-number { margin-left: auto; flex-shrink: 0; font-size: 12px; color: var(--muted); }
-.item-line-2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* 【修改】移除 .item-line-2 的 flex 布局 */
+.item-line-2 { 
+  font-size: 12px; 
+  color: var(--muted); 
+  margin-top: 2px; 
+}
+/* 【新增】.item-line-3 样式 */
+.item-line-3 {
+  font-size: 12px; 
+  margin-top: 2px;
+}
+/* --- 修改结束 --- */
+
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
 .cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px}
 .nowrap{white-space:nowrap}
@@ -133,19 +147,17 @@ let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
 function pad2(n){return (n<10?'0':'')+n;} function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
 
-// 【修改】syncTypeUI 增加对保险子模块的显隐控制
 function syncTypeUI(){ 
   const t=$('#f_type').value; 
   $('#blockPlan').style.display=(t==='plan'||t==='insurance')?'block':'none'; 
   $('#blockWarranty').style.display=(t==='warranty')?'block':'none'; 
-  $('#subBlockInsurance').style.display=(t==='insurance')?'block':'none'; // ⬅️ 新增
+  $('#subBlockInsurance').style.display=(t==='insurance')?'block':'none';
 }
 
 function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>日元/月</span><button class="ghost del" type="button">删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="ghost del" type="button">删除</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
-// 【修改】readForm 增加读取保期字段
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
@@ -155,7 +167,6 @@ function readForm(){
   } 
   const phases=[...$$('#phaseList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1,amount:Number(r.querySelector('input.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth); 
   const cancels=[...$$('#cancelList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); 
-  // ⬅️ 新增:读取保期
   return {
     id:editingId||undefined,...base,
     billingDay:Number($('#f_bill').value)||1,
@@ -165,7 +176,6 @@ function readForm(){
   }; 
 }
 
-// 【修改】fillForm 增加填充保期字段
 function fillForm(it){ 
   $('#f_type').value=it?.type||'plan'; 
   $('#f_name').value=it?.name||''; 
@@ -177,8 +187,8 @@ function fillForm(it){
   $('#cancelList').innerHTML=''; 
   (it?.pricePhases?.length?it.pricePhases:[{fromMonth:1,amount:0}]).forEach(addPhase); 
   (it?.cancelWindows||[]).forEach(addCancel); 
-  $('#f_ins_y').value = it?.policyTermYears || ''; // ⬅️ 新增
-  $('#f_ins_m').value = it?.policyTermMonths || ''; // ⬅️ 新增
+  $('#f_ins_y').value = it?.policyTermYears || ''; 
+  $('#f_ins_m').value = it?.policyTermMonths || ''; 
   syncTypeUI(); 
 }
 
@@ -214,7 +224,6 @@ function render(){
                     it.type === 'insurance' ? '<span class="small" style="color:#10b981">保险</span>' :
                     '<span class="small" style="color:#3b82f6">保修</span>';
     
-    // 【修改】根据类型生成附加信息
     let subDetail = '';
     if (it.type === 'warranty') {
       if (it.warrantyMonths) subDetail = `<span class="small" style="color:#3b82f6">保修期 ${it.warrantyMonths} 个月</span>`;
@@ -229,14 +238,19 @@ function render(){
       if (termStr) subDetail = `<span class="small" style="color:#10b981">保期 ${termStr}</span>`;
     }
 
+    // 【修改】调整 HTML 布局，将 subDetail 移到新的 item-line-3
     return `<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}">
       <div>
         <div class="title item-line-1">
           <span>${it.name}</span>
           ${typeLabel}
-          ${subDetail} <span class="meta item-number">#${it.number||'-'}</span>
+          <span class="meta item-number">#${it.number||'-'}</span>
         </div>
-        <div class="meta item-line-2">开始: ${it.startDate||'-'}</div>
+        <div class="meta item-line-2">
+          <span>开始: ${it.startDate||'-'}</span>
+        </div>
+        <div class="meta item-line-3">
+          ${subDetail} </div>
       </div>
       <div class="ops">
         <button class="ghost btnEdit" data-id="${it.id}" type="button">编辑</button>
@@ -244,6 +258,7 @@ function render(){
       </div>
     </div>`;
   }).join(''); 
+  // --- 修改结束 ---
   
   L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
   
@@ -379,10 +394,9 @@ $('#btnToday').onclick=()=>{
 
 $('#btnRenderMonths').onclick = () => render();
 $('#btnSearch').onclick = () => render();
-// 【修改】添加 "清空" 按钮逻辑
 $('#btnClearSearch').onclick = () => {
-  $('#filter').value = ''; // 清空输入框
-  render(); // 重新渲染
+  $('#filter').value = ''; 
+  render(); 
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
