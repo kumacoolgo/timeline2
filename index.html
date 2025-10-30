@@ -38,36 +38,23 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .item-line-1 { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .item-line-1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .item-line-1 .item-number { margin-left: auto; flex-shrink: 0; font-size: 12px; color: var(--muted); }
-
-.item-line-2 { 
-  font-size: 12px; 
-  color: var(--muted); 
-  margin-top: 2px; 
-}
-
-.item-line-3 {
-  font-size: 12px; 
-  margin-top: 2px;
-}
+.item-line-2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.item-line-3 { font-size: 12px; margin-top: 2px; }
 
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
 .cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px; position: relative;}
 .nowrap{white-space:nowrap}
 .badge{display:inline-block;padding:6px 10px;border-radius:10px;background:#eef5ff;color:#0f172a;border:1px solid #dbe8ff}
 .badge.cancel{background:#fff6f1;border-color:#ffd8bf}
-
 .badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } 
 .badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } 
 
 .today-line {
-  position: relative; 
-  grid-row: 1; 
-  height: 100%;
-  width: 2px;
+  position: relative; grid-row: 1; height: 100%; width: 2px;
   background-color: var(--brand);
   transform: translateX(-50%); 
   z-index: 10;
-  pointer-events: none; 
+  pointer-events: none;
 }
 
 #dlg{position:fixed; inset:0; display:none; align-items:center; justify-content:center;background:rgba(0,0,0,.35); z-index:9999}
@@ -82,64 +69,29 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 .row-fields .tm{width:60px}  
 
 .icon-btn {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 30px; 
-    height: 30px;
-    border: none;
-    border-radius: 50%; 
-    font-size: 1.1rem;
-    font-weight: bold;
-    line-height: 1;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background-color 0.2s;
+    display: flex; justify-content: center; align-items: center;
+    width: 30px; height: 30px; border: none; border-radius: 50%; 
+    font-size: 1.1rem; font-weight: bold; line-height: 1;
+    cursor: pointer; flex-shrink: 0; transition: background-color 0.2s;
 }
-.delete-btn {
-    background-color: #fff0f0;
-    color: #d93025;
-    border: 1px solid #f5c6cb;
-}
-.delete-btn:hover {
-    background-color: #f8d7da;
-}
-.add-btn {
-    background-color: #e6f7ff;
-    color: #1890ff;
-    border: 1px solid #b0dfff;
-}
-.add-btn:hover {
-    background-color: #d9efff;
-}
+.delete-btn { background-color: #fff0f0; color: #d93025; border: 1px solid #f5c6cb; }
+.delete-btn:hover { background-color: #f8d7da; }
+.add-btn { background-color: #e6f7ff; color: #1890ff; border: 1px solid #b0dfff; }
+.add-btn:hover { background-color: #d9efff; }
 
 @media (max-width: 860px){
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
   #phaseList .row-fields,
-  #cancelList .row-fields {
-    flex-wrap: nowrap;
-  }
-  
-  #leftWrap { 
-    max-height: 22vh; 
-    overflow-y: auto;
-    padding-top: 4px;
-    padding-left: 4px;
-    padding-right: 6px; 
-  }
+  #cancelList .row-fields { flex-wrap: nowrap; }
+  #leftWrap { max-height: 22vh; overflow-y: auto; padding-top: 4px; padding-left: 4px; padding-right: 6px; }
 }
 
 #dlgAuth .auth-view { display: none; }
 #dlgAuth .auth-view.active { display: block; }
 .link-btn {
-  background: none;
-  border: none;
-  color: var(--brand);
-  cursor: pointer;
-  padding: 0;
-  font-size: 12px;
-  text-align: left;
+  background: none; border: none; color: var(--brand);
+  cursor: pointer; padding: 0; font-size: 12px; text-align: left;
 }
 </style>
 </head>
@@ -301,6 +253,8 @@ let allCloudItems = [];
 let items = []; 
 let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
+let isProgrammaticScroll = false; // 【新增】防止 "今天" 按钮触发滚动保存的标志
+
 function pad2(n){return (n<10?'0':'')+n;} function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
 
 function syncTypeUI(){ 
@@ -317,13 +271,13 @@ $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCanc
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
+  
   const displayMonths = Number($('#months').value) || 24;
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
   
   if(type==='warranty'){
     return {
-      id:editingId||undefined,
-      ...base,
+      id:editingId||undefined, ...base,
       warrantyMonths:Number($('#f_wm').value)||0,
       displayMonths: displayMonths 
     }
@@ -333,7 +287,7 @@ function readForm(){
   const cancels=[...$$('#cancelList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); 
   
   return {
-    id:editingId||undefined,...base,
+    id:editingId||undefined, ...base,
     billingDay:Number($('#f_bill').value)||1,
     pricePhases:phases, cancelWindows:cancels,
     policyTermYears: Number($('#f_ins_y').value) || 0,
@@ -363,6 +317,7 @@ function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMo
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
 function render(){ 
+  // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
   if (!term) {
     items = [...allCloudItems]; 
@@ -377,6 +332,7 @@ function render(){
     activeId = items[0]?.id || null;
   }
   
+  // --- 2. 渲染左侧列表 ---
   const L=$('#leftWrap');
   if(sortableList) {
     sortableList.destroy();
@@ -422,19 +378,7 @@ function render(){
     </div>`;
   }).join(''); 
   
-  // 【【【【BUG 修复】】】】
-  // 将 clearTimeout 添加到 onclick 处理器中
-  // 这样可以在切换项目时立即取消任何待处理的滚动保存
-  L.querySelectorAll('.item').forEach(div=>{ 
-    const id=div.dataset.id; 
-    div.onclick=e=>{ 
-      if(e.target.closest('button')) return; 
-      clearTimeout(scrollTimer); // <-- 【修复】立即取消待处理的保存
-      activeId=id; 
-      render(); 
-    }; 
-  }); 
-
+  L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
   L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{e.stopPropagation(); const it=allCloudItems.find(x=>x.id===b.dataset.id); editingId=it.id; fillForm(it); $('#dlgTitle').textContent='编辑项目'; $('#dlg').style.display='flex';}); 
   L.querySelectorAll('.btnDel').forEach(b=> b.onclick= async e=>{ 
     e.stopPropagation(); 
@@ -448,6 +392,7 @@ function render(){
     }
   }); 
   
+  // --- 3. 渲染右侧时间轴 ---
   const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); 
   
   if (!data.length){ 
@@ -614,6 +559,7 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
+// 【修改】"今天"按钮 - 增加了 isProgrammaticScroll 标志
 $('#btnToday').onclick = async () => {
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
@@ -622,6 +568,7 @@ $('#btnToday').onclick = async () => {
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
+    // 找到了，正常滚动
     const todayLine = todayCellHead.querySelector('.today-line');
     let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
     if (todayLine) {
@@ -629,12 +576,18 @@ $('#btnToday').onclick = async () => {
       const targetScroll = todayCellHead.offsetLeft + lineLeftInCell - (gridContainer.clientWidth / 3);
       scrollLeft = Math.max(0, targetScroll);
     }
+    
+    isProgrammaticScroll = true; // 【新增】禁止滚动监听
     gridContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+    setTimeout(() => { isProgrammaticScroll = false; }, 1000); // 1秒后解除禁止
+    
   } else {
+    // --- 没找到，重置 Profile 并重绘 ---
     alert('今天不在当前显示的时间范围内。将重置视图到项目开始日期。');
     
     const activeItem = allCloudItems.find(it => it.id === activeId);
     if (ONLINE && activeItem) {
+      isProgrammaticScroll = true; // 【新增】禁止滚动监听
       activeItem.displayStartMonth = null; 
       try {
         await api('/api/items?id=' + activeId, {
@@ -647,9 +600,12 @@ $('#btnToday').onclick = async () => {
       }
     }
     render(); 
+    setTimeout(() => { isProgrammaticScroll = false; }, 100); // render后解除禁止
+    // --- 重置结束 ---
   }
 };
 
+// 【修改】"显示"按钮 - 会保存月数
 $('#btnRenderMonths').onclick = async () => {
   const newMonths = Number($('#months').value) || 24;
   const activeItem = allCloudItems.find(it => it.id === activeId);
@@ -676,6 +632,7 @@ $('#btnClearSearch').onclick = () => {
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
+// 认证 API
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
@@ -694,6 +651,7 @@ async function api(path, init){
   return data;
 }
 
+// 认证弹窗逻辑
 const DlgAuth = {
   el: $('#dlgAuth'),
   views: {
@@ -706,31 +664,19 @@ const DlgAuth = {
     register: $('#reg_msg'),
     reset: $('#reset_msg'),
   },
-  
-  show(viewName = 'login') {
-    this.switchView(viewName);
-    this.el.style.display = 'flex';
-  },
-  
-  hide() {
-    this.el.style.display = 'none';
-  },
-  
+  show(viewName = 'login') { this.switchView(viewName); this.el.style.display = 'flex'; },
+  hide() { this.el.style.display = 'none'; },
   switchView(viewName) {
     Object.values(this.views).forEach(v => v.classList.remove('active'));
     Object.values(this.msgs).forEach(m => m.textContent = '');
-    if (this.views[viewName]) {
-      this.views[viewName].classList.add('active');
-    }
+    if (this.views[viewName]) this.views[viewName].classList.add('active');
   },
-  
   showMsg(view, message, isError = true) {
     if (this.msgs[view]) {
       this.msgs[view].textContent = message;
       this.msgs[view].style.color = isError ? '#ef4444' : '#16a34a';
     }
   },
-  
   startCountdown(btn) {
     let seconds = 60;
     btn.disabled = true;
@@ -739,9 +685,7 @@ const DlgAuth = {
     const interval = setInterval(() => {
       seconds--;
       if (seconds <= 0) {
-        clearInterval(interval);
-        btn.textContent = originalText;
-        btn.disabled = false;
+        clearInterval(interval); btn.textContent = originalText; btn.disabled = false;
       } else {
         btn.textContent = `重新发送 (${seconds}s)`;
       }
@@ -749,17 +693,16 @@ const DlgAuth = {
   }
 };
 
+// 认证按钮绑定
 $('#btnUser').onclick = () => {
   $('#login_em').value = ''; $('#login_pw').value = '';
   $('#reg_em').value = ''; $('#reg_pw').value = ''; $('#reg_code').value = '';
   $('#reset_em').value = ''; $('#reset_code').value = ''; $('#reset_pw').value = '';
   DlgAuth.show('login'); 
 };
-
 $('#btnAuthCancel').onclick = () => DlgAuth.hide();
 $('#btnRegCancel').onclick = () => DlgAuth.hide();
 $('#btnResetCancel').onclick = () => DlgAuth.hide();
-
 $('#btnGoReg').onclick = () => DlgAuth.switchView('register');
 $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
 $('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
@@ -767,29 +710,17 @@ $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
 
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
-  try {
-    await api('/api/logout', { method: 'POST' });
-    location.reload(); 
-  } catch (e) {
-    alert('登出失败: ' + e.message);
-  }
+  try { await api('/api/logout', { method: 'POST' }); location.reload(); } 
+  catch (e) { alert('登出失败: ' + e.message); }
 };
 
 $('#btnSendRegCode').onclick = async () => {
   const btn = $('#btnSendRegCode');
   const email = $('#reg_em').value.trim();
-  if (!email) {
-    DlgAuth.showMsg('register', '请输入邮箱');
-    return;
-  }
-  btn.disabled = true;
-  DlgAuth.showMsg('register', '发送中...', false);
+  if (!email) { DlgAuth.showMsg('register', '请输入邮箱'); return; }
+  btn.disabled = true; DlgAuth.showMsg('register', '发送中...', false);
   try {
-    const data = await api('/api/register-send-code', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email })
-    });
+    const data = await api('/api/register-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
     DlgAuth.showMsg('register', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn); 
   } catch (e) {
@@ -799,71 +730,40 @@ $('#btnSendRegCode').onclick = async () => {
 };
 
 $('#goReg').onclick = async () => {
-  const b = $('#goReg');
-  b.disabled = true;
-  DlgAuth.showMsg('register', '');
+  const b = $('#goReg'); b.disabled = true; DlgAuth.showMsg('register', '');
   try {
     const email = $('#reg_em').value.trim();
     const password = $('#reg_pw').value;
     const code = $('#reg_code').value.trim();
-    
-    await api('/api/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password, code }) 
-    });
-    
+    await api('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password, code }) });
     DlgAuth.showMsg('register', '注册成功，请返回登录', false);
   } catch (e) {
     DlgAuth.showMsg('register', e.message || '注册失败');
-  } finally {
-    b.disabled = false;
-  }
+  } finally { b.disabled = false; }
 };
 
 $('#goLogin').onclick = async () => {
-  const b = $('#goLogin');
-  b.disabled = true;
-  DlgAuth.showMsg('login', '');
+  const b = $('#goLogin'); b.disabled = true; DlgAuth.showMsg('login', '');
   try {
-    await api('/api/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        email: $('#login_em').value.trim(),
-        password: $('#login_pw').value
-      })
-    });
+    await api('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('#login_em').value.trim(), password: $('#login_pw').value }) });
     const me = await api('/api/me');
     ONLINE = true;
     $('#btnUser').textContent = me.email;
     $('#btnLogout').style.display = 'inline-block';
     DlgAuth.hide();
-    
     await loadCloudItems();
-
   } catch (e) {
     DlgAuth.showMsg('login', e.message || '登录失败');
-  } finally {
-    b.disabled = false;
-  }
+  } finally { b.disabled = false; }
 };
 
 $('#btnSendResetCode').onclick = async () => {
   const btn = $('#btnSendResetCode');
   const email = $('#reset_em').value.trim();
-  if (!email) {
-    DlgAuth.showMsg('reset', '请输入注册邮箱');
-    return;
-  }
-  btn.disabled = true;
-  DlgAuth.showMsg('reset', '发送中...', false);
+  if (!email) { DlgAuth.showMsg('reset', '请输入注册邮箱'); return; }
+  btn.disabled = true; DlgAuth.showMsg('reset', '发送中...', false);
   try {
-    const data = await api('/api/password-reset-send-code', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email })
-    });
+    const data = await api('/api/password-reset-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
     DlgAuth.showMsg('reset', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn);
   } catch (e) {
@@ -873,34 +773,22 @@ $('#btnSendResetCode').onclick = async () => {
 };
 
 $('#goReset').onclick = async () => {
-  const b = $('#goReset');
-  b.disabled = true;
-  DlgAuth.showMsg('reset', '');
+  const b = $('#goReset'); b.disabled = true; DlgAuth.showMsg('reset', '');
   try {
     const email = $('#reset_em').value.trim();
     const code = $('#reset_code').value.trim();
     const newPassword = $('#reset_pw').value;
-
-    await api('/api/password-reset-confirm', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, code, newPassword })
-    });
-    
+    await api('/api/password-reset-confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, code, newPassword }) });
     DlgAuth.showMsg('reset', '密码重置成功，请返回登录', false);
   } catch (e) {
     DlgAuth.showMsg('reset', e.message || '重置失败');
-  } finally {
-    b.disabled = false;
-  }
+  } finally { b.disabled = false; }
 };
-
 
 async function loadCloudItems() {
   try {
     allCloudItems = await api('/api/items'); 
     allCloudItems.sort((a, b) => (a.order || 0) - (b.order || 0));
-
     if (allCloudItems.length > 0 && !allCloudItems.find(it => it.id === activeId)) {
       activeId = allCloudItems[0].id;
     }
@@ -929,10 +817,13 @@ function bootstrap(){
 }
 bootstrap();
 
+// --- 【新增/修改】保存 "Profile" (滚动位置) ---
 let scrollTimer = null;
 const gridContainer = $('#gridContainer');
 
 gridContainer.onscroll = () => {
+  if (isProgrammaticScroll) return; // 【新增】如果是 "今天" 按钮触发的, 则忽略
+  
   const currentActiveId = activeId; 
   if (!ONLINE || !currentActiveId) return; 
   
@@ -944,7 +835,7 @@ gridContainer.onscroll = () => {
   
   $$('#gridHead .cell').forEach(cell => {
     const diff = cell.offsetLeft - scrollLeft;
-    if (diff >= -20 && diff < minDiff) {
+    if (diff >= -20 && diff < minDiff) { // 寻找视口左边缘(或略过一点)的第一个 cell
       minDiff = diff;
       closestCell = cell;
     }
@@ -953,7 +844,7 @@ gridContainer.onscroll = () => {
   if (!closestCell) return;
   const displayStartMonth = closestCell.dataset.ym;
   if (!displayStartMonth) return;
-
+  
   scrollTimer = setTimeout(() => {
     saveScrollProfile(currentActiveId, displayStartMonth); 
   }, 1000); 
@@ -967,6 +858,7 @@ async function saveScrollProfile(itemId, monthToSave) {
   if (activeItem && activeItem.displayStartMonth !== monthToSave) {
     activeItem.displayStartMonth = monthToSave; 
     try {
+      // 【修复】移除了上一版代码中多余的 "G"
       await api('/api/items?id=' + itemId, { 
         method: 'PUT',
         headers: {'content-type': 'application/json'},
@@ -977,5 +869,7 @@ async function saveScrollProfile(itemId, monthToSave) {
     }
   }
 }
+// --- 【新增】结束 ---
+
 </script>
 </body></html>
