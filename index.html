@@ -24,12 +24,11 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 #layout{display:grid;grid-template-columns: 340px 1fr; gap:14px; align-items:start}
 @media (min-width: 861px){
   #leftWrap{
-    /* 4 行 * 行高 + 3 个间距(每行之间 8px) + 顶部/底部余量 */
     max-height: calc(var(--row-h) * 4 + 24px);
     overflow-y: auto;
     padding-top: 4px;
     padding-left: 4px;
-    padding-right: 6px; /* 预留滚动条空间 */
+    padding-right: 6px; 
   }
 }
 
@@ -57,18 +56,18 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .badge{display:inline-block;padding:6px 10px;border-radius:10px;background:#eef5ff;color:#0f172a;border:1px solid #dbe8ff}
 .badge.cancel{background:#fff6f1;border-color:#ffd8bf}
 
-.badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } /* 浅蓝色 */
-.badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } /* 浅黄色 */
+.badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } 
+.badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } 
 
 .today-line {
-  position: relative; /* 作为一个 grid item */
-  grid-row: 1; /* 确保在第一行 */
+  position: relative; 
+  grid-row: 1; 
   height: 100%;
   width: 2px;
   background-color: var(--brand);
-  transform: translateX(-50%); /* 将 2px 宽的线在 grid 线上居中 */
+  transform: translateX(-50%); 
   z-index: 10;
-  pointer-events: none; /* 防止遮挡内容 */
+  pointer-events: none; 
 }
 
 #dlg{position:fixed; inset:0; display:none; align-items:center; justify-content:center;background:rgba(0,0,0,.35); z-index:9999}
@@ -77,19 +76,19 @@ fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top
 fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:8px;align-items:center;margin:6px 0}
 
 .row-fields input{width:100px} 
-.row-fields .m{width:60px}   /* 金额段-月 */
-.row-fields .a{width:80px}   /* 金额段-金额 */
-.row-fields .fm{width:60px}  /* 退会期-开始月 */
-.row-fields .tm{width:60px}  /* 退会期-结束月 */
+.row-fields .m{width:60px}   
+.row-fields .a{width:80px}   
+.row-fields .fm{width:60px}  
+.row-fields .tm{width:60px}  
 
 .icon-btn {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 30px; /* 调整大小以适应弹窗 */
+    width: 30px; 
     height: 30px;
     border: none;
-    border-radius: 50%; /* 圆形按钮 */
+    border-radius: 50%; 
     font-size: 1.1rem;
     font-weight: bold;
     line-height: 1;
@@ -97,7 +96,6 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     flex-shrink: 0;
     transition: background-color 0.2s;
 }
-/* 减号按钮 ➖ */
 .delete-btn {
     background-color: #fff0f0;
     color: #d93025;
@@ -106,7 +104,6 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 .delete-btn:hover {
     background-color: #f8d7da;
 }
-/* 加号按钮 ➕ */
 .add-btn {
     background-color: #e6f7ff;
     color: #1890ff;
@@ -129,11 +126,10 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     overflow-y: auto;
     padding-top: 4px;
     padding-left: 4px;
-    padding-right: 6px; /* 预留滚动条空间 */
+    padding-right: 6px; 
   }
 }
 
-/* 【新增】认证弹窗样式 */
 #dlgAuth .auth-view { display: none; }
 #dlgAuth .auth-view.active { display: block; }
 .link-btn {
@@ -318,14 +314,10 @@ function addPhase(i){const d=document.createElement('div');d.className='row-fiel
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
-// 【修改】readForm() - 会保存月数
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
-  
-  // 读取当前输入框的月数
   const displayMonths = Number($('#months').value) || 24;
-  
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
   
   if(type==='warranty'){
@@ -333,7 +325,7 @@ function readForm(){
       id:editingId||undefined,
       ...base,
       warrantyMonths:Number($('#f_wm').value)||0,
-      displayMonths: displayMonths // 保存月数
+      displayMonths: displayMonths 
     }
   } 
   
@@ -346,7 +338,7 @@ function readForm(){
     pricePhases:phases, cancelWindows:cancels,
     policyTermYears: Number($('#f_ins_y').value) || 0,
     policyTermMonths: Number($('#f_ins_m').value) || 0,
-    displayMonths: displayMonths // 保存月数
+    displayMonths: displayMonths 
   }; 
 }
 
@@ -364,17 +356,13 @@ function fillForm(it){
   $('#f_ins_y').value = it?.policyTermYears || ''; 
   $('#f_ins_m').value = it?.policyTermMonths || ''; 
   syncTypeUI(); 
-  
-  // 【注意】月数输入框在 render() 中被填充
 }
 
 function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a } 
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
-// 【修改】render() - 会读取 profile
 function render(){ 
-  // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
   if (!term) {
     items = [...allCloudItems]; 
@@ -389,7 +377,6 @@ function render(){
     activeId = items[0]?.id || null;
   }
   
-  // --- 2. 渲染左侧列表 ---
   const L=$('#leftWrap');
   if(sortableList) {
     sortableList.destroy();
@@ -449,38 +436,26 @@ function render(){
     }
   }); 
   
-  // --- 3. 渲染右侧时间轴 ---
   const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); 
   
-  // 【修改】如果 data (当前选中项目) 为空，则清空并返回
   if (!data.length){ 
     head.innerHTML=''; 
     grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; 
     return; 
   } 
   
-  const it = data[0]; // 获取当前选中的项目
-  
-  // 【修改】从 Profile 中读取 "月数"
-  // 优先级: 1. 项目保存的值  2. 默认值 24
+  const it = data[0]; 
   const months = Number(it.displayMonths) || 24;
   $('#months').value = months;
   
-  // --- 【修改】从 Profile 中读取 "起始月份" ---
   let startMonthDate = null;
-  
-  // 1. 尝试从 profile (displayStartMonth) 读取
   if (it.displayStartMonth) {
-    startMonthDate = new Date(it.displayStartMonth + '-01'); // e.g., "2026-10" -> Date("2026-10-01")
+    startMonthDate = new Date(it.displayStartMonth + '-01'); 
   }
-  
-  // 2. 兜底：如果 profile 不存在或无效，则使用项目的 startDate
-  //    (!!isNaN(startMonthDate) 检查 "Invalid Date")
   if (!startMonthDate || isNaN(startMonthDate)) {
     startMonthDate = new Date(it.startDate || new Date());
   }
   const minStart = startOfMonth(startMonthDate);
-  // --- 【修改】结束 ---
   
   const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
@@ -627,7 +602,6 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
-// 【修改】"今天"按钮 - 找不到时会重置视图
 $('#btnToday').onclick = async () => {
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
@@ -636,7 +610,6 @@ $('#btnToday').onclick = async () => {
   const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
   
   if (todayCellHead) {
-    // 找到了，正常滚动
     const todayLine = todayCellHead.querySelector('.today-line');
     let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
     if (todayLine) {
@@ -646,14 +619,12 @@ $('#btnToday').onclick = async () => {
     }
     gridContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' });
   } else {
-    // --- 没找到，重置 Profile 并重绘 ---
     alert('今天不在当前显示的时间范围内。将重置视图到项目开始日期。');
     
     const activeItem = allCloudItems.find(it => it.id === activeId);
     if (ONLINE && activeItem) {
-      activeItem.displayStartMonth = null; // 1. 清空本地 profile
+      activeItem.displayStartMonth = null; 
       try {
-        // 2. 清空服务器 profile (发送 null)
         await api('/api/items?id=' + activeId, {
           method: 'PUT',
           headers: {'content-type': 'application/json'},
@@ -663,21 +634,17 @@ $('#btnToday').onclick = async () => {
         alert('重置视图失败: ' + e.message);
       }
     }
-    render(); // 3. 重新渲染 (render 函数会回退到 startDate)
-    // --- 重置结束 ---
+    render(); 
   }
 };
 
-// 【修改】"显示"按钮 - 会保存月数
 $('#btnRenderMonths').onclick = async () => {
   const newMonths = Number($('#months').value) || 24;
   const activeItem = allCloudItems.find(it => it.id === activeId);
 
-  // 检查是否登录且有选中项目
   if (ONLINE && activeItem && activeItem.displayMonths !== newMonths) {
-    activeItem.displayMonths = newMonths; // 1. 更新本地数据
+    activeItem.displayMonths = newMonths; 
     try {
-      // 2. 更新服务器数据
       await api('/api/items?id=' + activeId, {
         method: 'PUT',
         headers: {'content-type': 'application/json'},
@@ -687,7 +654,7 @@ $('#btnRenderMonths').onclick = async () => {
       alert('保存月数失败: ' + e.message);
     }
   }
-  render(); // 3. 重新渲染
+  render(); 
 };
 
 $('#btnSearch').onclick = () => render();
@@ -697,19 +664,17 @@ $('#btnClearSearch').onclick = () => {
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
-// 【修改】认证 API
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
   let data; try{ data = JSON.parse(text||'{}') }catch{ data = { error:text||'网络错误' } }
   if(!r.ok){
-    // 【修改】API 路径检查中加入新的 API
     const isAuthPath = ['/api/login', '/api/register', '/api/register-send-code', '/api/password-reset-send-code', '/api/password-reset-confirm'].includes(path);
     if (r.status === 401 && !isAuthPath) {
       ONLINE = false;
       $('#btnUser').textContent = '登录/注册';
       $('#btnLogout').style.display = 'none';
-      DlgAuth.show('login'); // 【修改】调用 DlgAuth.show()
+      DlgAuth.show('login'); 
     }
     const msg = data.reason ? `${data.error} (${data.reason})` : (data.error || `HTTP ${r.status}`);
     throw new Error(msg);
@@ -717,7 +682,6 @@ async function api(path, init){
   return data;
 }
 
-// --- 【新增/修改】认证弹窗逻辑 ---
 const DlgAuth = {
   el: $('#dlgAuth'),
   views: {
@@ -755,7 +719,6 @@ const DlgAuth = {
     }
   },
   
-  // 倒计时
   startCountdown(btn) {
     let seconds = 60;
     btn.disabled = true;
@@ -774,16 +737,13 @@ const DlgAuth = {
   }
 };
 
-// 打开登录弹窗
 $('#btnUser').onclick = () => {
-  // 清空所有输入框
   $('#login_em').value = ''; $('#login_pw').value = '';
   $('#reg_em').value = ''; $('#reg_pw').value = ''; $('#reg_code').value = '';
   $('#reset_em').value = ''; $('#reset_code').value = ''; $('#reset_pw').value = '';
   DlgAuth.show('login'); 
 };
 
-// 弹窗内导航
 $('#btnAuthCancel').onclick = () => DlgAuth.hide();
 $('#btnRegCancel').onclick = () => DlgAuth.hide();
 $('#btnResetCancel').onclick = () => DlgAuth.hide();
@@ -793,7 +753,6 @@ $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
 $('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
 $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
 
-// 登出
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
   try {
@@ -804,7 +763,6 @@ $('#btnLogout').onclick = async () => {
   }
 };
 
-// --- 【新增】注册流程 ---
 $('#btnSendRegCode').onclick = async () => {
   const btn = $('#btnSendRegCode');
   const email = $('#reg_em').value.trim();
@@ -821,10 +779,10 @@ $('#btnSendRegCode').onclick = async () => {
       body: JSON.stringify({ email: email })
     });
     DlgAuth.showMsg('register', data.message || '验证码已发送', false);
-    DlgAuth.startCountdown(btn); // 开始倒计时
+    DlgAuth.startCountdown(btn); 
   } catch (e) {
     DlgAuth.showMsg('register', e.message || '发送失败');
-    btn.disabled = false; // 发送失败，允许重试
+    btn.disabled = false; 
   }
 };
 
@@ -840,7 +798,7 @@ $('#goReg').onclick = async () => {
     await api('/api/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password, code }) // 【修改】发送 code
+      body: JSON.stringify({ email, password, code }) 
     });
     
     DlgAuth.showMsg('register', '注册成功，请返回登录', false);
@@ -851,7 +809,6 @@ $('#goReg').onclick = async () => {
   }
 };
 
-// --- 【修改】登录流程 ---
 $('#goLogin').onclick = async () => {
   const b = $('#goLogin');
   b.disabled = true;
@@ -880,7 +837,6 @@ $('#goLogin').onclick = async () => {
   }
 };
 
-// --- 【新增】重置密码流程 ---
 $('#btnSendResetCode').onclick = async () => {
   const btn = $('#btnSendResetCode');
   const email = $('#reset_em').value.trim();
@@ -942,7 +898,6 @@ async function loadCloudItems() {
   }
 }
 
-// --- 【修改】checkLogin ---
 async function checkLogin() {
   try {
     const me = await api('/api/me');
@@ -953,7 +908,7 @@ async function checkLogin() {
   } catch (e) {
     ONLINE = false;
     $('#btnUser').textContent = '登录/注册';
-    DlgAuth.show('login'); // 自动显示登录弹窗
+    DlgAuth.show('login'); 
   }
 }
 
@@ -962,26 +917,20 @@ function bootstrap(){
 }
 bootstrap();
 
-// --- 【新增/修改】保存 "Profile" (滚动位置) ---
 let scrollTimer = null;
 const gridContainer = $('#gridContainer');
 
 gridContainer.onscroll = () => {
-  const currentActiveId = activeId; // 【修改】捕获当前的 activeId
+  const currentActiveId = activeId; 
   if (!ONLINE || !currentActiveId) return; 
   
   clearTimeout(scrollTimer);
   
-  // --- 【修改】立即计算, 延迟保存 ---
   const scrollLeft = gridContainer.scrollLeft;
   let closestCell = null;
   let minDiff = Infinity;
   
-  // 查找离 scrollLeft 左侧最近的 cell
   $$('#gridHead .cell').forEach(cell => {
-    // 找到视口左边缘（scrollLeft）“之后”的第一个单元格
-    // cell.offsetLeft - scrollLeft >= 0
-    // 我们给 20px 的容差
     const diff = cell.offsetLeft - scrollLeft;
     if (diff >= -20 && diff < minDiff) {
       minDiff = diff;
@@ -992,26 +941,23 @@ gridContainer.onscroll = () => {
   if (!closestCell) return;
   const displayStartMonth = closestCell.dataset.ym;
   if (!displayStartMonth) return;
-  // --- 【修改】计算结束 ---
 
-  // 1秒后执行保存
   scrollTimer = setTimeout(() => {
     saveScrollProfile(currentActiveId, displayStartMonth); 
   }, 1000); 
 };
 
-async function saveScrollProfile(itemId, monthToSave) { // 【修改】接收 monthToSave
+async function saveScrollProfile(itemId, monthToSave) { 
   if (!ONLINE || !itemId) return; 
 
-  // 【修复】确保我们获取的是最新的 allCloudItems 里的数据
   const activeItem = allCloudItems.find(it => it.id === itemId);
   
-  // 仅当 profile 变化时才保存
   if (activeItem && activeItem.displayStartMonth !== monthToSave) {
-    activeItem.displayStartMonth = monthToSave; // 1. 更新本地
+    activeItem.displayStartMonth = monthToSave; 
     try {
-      // 2. 更新服务器
-      await api('/api/items?id='G + itemId, { 
+      // 【【【【修复 TYPO】】】】
+      // 删除了上一版中多余的 'G'
+      await api('/api/items?id=' + itemId, { 
         method: 'PUT',
         headers: {'content-type': 'application/json'},
         body: JSON.stringify({ displayStartMonth: monthToSave })
@@ -1021,7 +967,5 @@ async function saveScrollProfile(itemId, monthToSave) { // 【修改】接收 mo
     }
   }
 }
-// --- 【新增】结束 ---
-
 </script>
 </body></html>
