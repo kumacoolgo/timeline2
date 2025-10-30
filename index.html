@@ -109,11 +109,6 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
       <input id="filter" placeholder="搜索项目/类型/编号..." style="flex: 1; min-width: 0;"/>
       <button id="btnSearch" class="ghost">搜索</button>
       <button id="btnClearSearch" class="ghost">清空</button>
-    </div>
-    <div class="row">
-      <label class="small">月数</label>
-      <input id="months" type="number" value="24" min="1" max="120" style="width: 70px;">
-      <button id="btnRenderMonths" class="ghost" style="padding: 8px 10px;">显示</button>
       <button id="btnToday" class="ghost">今天</button>
     </div>
     <div class="row">
@@ -253,9 +248,13 @@ let allCloudItems = [];
 let items = []; 
 let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
-// 【删除】删除了 isProgrammaticScroll 标志
 
-function pad2(n){return (n<10?'0':'')+n;} function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
+// --- 【新增】工具函数 ---
+function pad2(n){return (n<10?'0':'')+n;} 
+function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} 
+function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
+function MaxDate(d1, d2) { return d1 > d2 ? d1 : d2; }
+// --- 结束 ---
 
 function syncTypeUI(){ 
   const t=$('#f_type').value; 
@@ -268,18 +267,17 @@ function addPhase(i){const d=document.createElement('div');d.className='row-fiel
 function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
+// 【修改】readForm() - 删除了 displayMonths
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
   if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
   
-  const displayMonths = Number($('#months').value) || 24;
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
   
   if(type==='warranty'){
     return {
       id:editingId||undefined, ...base,
-      warrantyMonths:Number($('#f_wm').value)||0,
-      displayMonths: displayMonths 
+      warrantyMonths:Number($('#f_wm').value)||0
     }
   } 
   
@@ -291,8 +289,7 @@ function readForm(){
     billingDay:Number($('#f_bill').value)||1,
     pricePhases:phases, cancelWindows:cancels,
     policyTermYears: Number($('#f_ins_y').value) || 0,
-    policyTermMonths: Number($('#f_ins_m').value) || 0,
-    displayMonths: displayMonths 
+    policyTermMonths: Number($('#f_ins_m').value) || 0
   }; 
 }
 
@@ -316,6 +313,34 @@ function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.s
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
+// 【新增】滚动到 "今天" 的辅助函数
+function scrollToToday(behavior = 'smooth') {
+  const today = new Date();
+  const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
+  const gridContainer = $('#gridContainer');
+  const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
+  
+  if (todayCellHead) {
+    const todayLine = todayCellHead.querySelector('.today-line');
+    const containerWidth = gridContainer.clientWidth;
+    let targetScroll = 0;
+    
+    if (todayLine) {
+      // 居中 "今天" 的红线
+      targetScroll = todayCellHead.offsetLeft + todayLine.offsetLeft - (containerWidth / 2) + (todayLine.clientWidth / 2);
+    } else {
+      // 居中 "今天" 所在的月份格子
+      targetScroll = todayCellHead.offsetLeft - (containerWidth / 2) + (todayCellHead.clientWidth / 2);
+    }
+    gridContainer.scrollTo({ left: Math.max(0, targetScroll), behavior: behavior });
+  } else {
+    // "今天" 不在渲染范围内 (例如项目是 2028 年才开始)
+    // 此时不做任何事，保持在项目起点
+    console.warn('Today is not in the rendered range.');
+  }
+}
+
+// 【修改】 render() 函数 - 自动计算月数并自动滚动到 "今天"
 function render(){ 
   // --- 1. 执行过滤 ---
   const term = $('#filter').value.trim().toLowerCase();
@@ -402,17 +427,64 @@ function render(){
   } 
   
   const it = data[0]; 
-  const months = Number(it.displayMonths) || 24;
-  $('#months').value = months;
   
-  // 【修复】时间轴起点 *永远* 基于项目的 startDate
-  // 删除了所有 displayStartMonth 的错误逻辑
+  // --- 【修改】自动计算时间轴起止点 ---
+  // 1. 计算 minStart
   const minStart = startOfMonth(new Date(it.startDate || new Date()));
+
+  // 2. 计算 maxEnd
+  const today = new Date();
+  const todayPlusOneYear = addMonths(today, 12);
+
+  // 候选终点：至少是 (今天+1年) 或 (项目起点)
+  let maxEndCandidate = MaxDate(todayPlusOneYear, minStart);
   
-  const mlist=[]; for(let i=0;i<months;i++) mlist.push(addMonths(minStart,i)); 
+  const itemStartDate = new Date(it.startDate);
+  
+  if (it.type === 'plan' || it.type === 'insurance') {
+    // 检查最后金额设定日
+    if (it.pricePhases && it.pricePhases.length > 0) {
+      const lastPhase = it.pricePhases.sort((a,b) => b.fromMonth - a.fromMonth)[0];
+      const lastPhaseMonth = (lastPhase.fromMonth || 1) - 1;
+      const lastPhaseDate = addMonths(itemStartDate, lastPhaseMonth);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastPhaseDate, 12));
+    }
+    // 检查最后退会期
+    if (it.cancelWindows && it.cancelWindows.length > 0) {
+      const lastWindow = it.cancelWindows.sort((a,b) => b.toMonth - a.toMonth)[0];
+      const lastWindowMonth = (lastWindow.toMonth || 1) - 1; 
+      const lastWindowDate = addMonths(itemStartDate, lastWindowMonth);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastWindowDate, 12));
+    }
+    // 检查保期 (仅 insurance)
+    if (it.type === 'insurance') {
+      const policyMonths = (Number(it.policyTermYears) || 0) * 12 + (Number(it.policyTermMonths) || 0);
+      if (policyMonths > 0) {
+        const policyEndDate = addMonths(itemStartDate, policyMonths);
+        maxEndCandidate = MaxDate(maxEndCandidate, addMonths(policyEndDate, 12));
+      }
+    }
+  } else if (it.type === 'warranty') {
+    // 检查保修期
+    const warrantyMonths = Number(it.warrantyMonths) || 0;
+    if (warrantyMonths > 0) {
+      const warrantyEndDate = addMonths(itemStartDate, warrantyMonths);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(warrantyEndDate, 12));
+    }
+  }
+  
+  let maxEnd = startOfMonth(maxEndCandidate);
+  // --- 自动计算结束 ---
+  
+  const mlist=[];
+  let currentMonth = new Date(minStart);
+  while (currentMonth <= maxEnd) {
+    mlist.push(new Date(currentMonth));
+    currentMonth = addMonths(currentMonth, 1);
+  }
+  
   head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
   
-  const today = new Date();
   const todayY = today.getFullYear();
   const todayM = today.getMonth();
   const todayD = today.getDate();
@@ -522,6 +594,11 @@ function render(){
       }
     }
   });
+  
+  // --- 【修改】切换项目时, 自动滚动到 "今天" (无动画) ---
+  setTimeout(() => {
+    scrollToToday('auto'); // 'auto' for instant scroll
+  }, 0);
 }
 $('#f_type').onchange=syncTypeUI; $('#btnAdd').onclick=()=>{ editingId=null; fillForm(null); $('#dlgTitle').textContent='新增项目'; $('#dlg').style.display='flex'; }; $('#btnClose').onclick=()=>$('#dlg').style.display='none'; $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
 
@@ -554,55 +631,12 @@ $('#btnSave').onclick= async ()=>{
   }
 };
 
-// 【修改】"今天"按钮 - 删除了 isProgrammaticScroll 标志
+// 【修改】"今天" 按钮 - 仅滚动 (有动画)
 $('#btnToday').onclick = async () => {
-  const today = new Date();
-  const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
-  const gridContainer = $('#grid').parentElement;
-  
-  const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
-  
-  if (todayCellHead) {
-    // 找到了，正常滚动
-    const todayLine = todayCellHead.querySelector('.today-line');
-    let scrollLeft = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
-    if (todayLine) {
-      const lineLeftInCell = todayLine.offsetLeft;
-      const targetScroll = todayCellHead.offsetLeft + lineLeftInCell - (gridContainer.clientWidth / 3);
-      scrollLeft = Math.max(0, targetScroll);
-    }
-    
-    gridContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-    
-  } else {
-    // --- 没找到，重置 Profile 并重绘 ---
-    alert('今天不在当前显示的时间范围内。');
-    
-    // 【修改】删除了重置 profile 的逻辑，因为 "profile" (displayStartMonth) 已经不存在了
-    
-    // 只是提醒用户，不再重置视图
-  }
+  scrollToToday('smooth');
 };
 
-// 【修改】"显示"按钮 - 会保存月数
-$('#btnRenderMonths').onclick = async () => {
-  const newMonths = Number($('#months').value) || 24;
-  const activeItem = allCloudItems.find(it => it.id === activeId);
-
-  if (ONLINE && activeItem && activeItem.displayMonths !== newMonths) {
-    activeItem.displayMonths = newMonths; 
-    try {
-      await api('/api/items?id=' + activeId, {
-        method: 'PUT',
-        headers: {'content-type': 'application/json'},
-        body: JSON.stringify({ displayMonths: newMonths })
-      });
-    } catch (e) {
-      alert('保存月数失败: ' + e.message);
-    }
-  }
-  render(); 
-};
+// 【删除】"显示" 按钮 (btnRenderMonths) 的逻辑已移除
 
 $('#btnSearch').onclick = () => render();
 $('#btnClearSearch').onclick = () => {
