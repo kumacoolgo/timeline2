@@ -3,15 +3,11 @@ const { Ratelimit } = require('@upstash/ratelimit');
 const { Redis } = require('@upstash/redis');
 const { getIP } = require('./http');
 
-// 【修改】不再使用 Redis.fromEnv()
-// 我们手动从 process.env 读取变量来创建 Redis 实例
-// 这在 Vercel 环境中更健壮
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// 你现有的限流器配置（无需改变）
 const rl = {
   globalIp10m: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '10 m'), prefix: 'rl:g:ip10m' }),
   loginIp10m: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(20, '10 m'), prefix: 'rl:login:ip' }),
@@ -26,45 +22,28 @@ async function apply(limiter, key, res) {
     res.setHeader('X-RateLimit-Limit', String(r.limit));
     res.setHeader('X-RateLimit-Remaining', String(Math.max(0, r.remaining)));
     res.setHeader('X-RateLimit-Reset', String(Math.floor(r.reset / 1000)));
-    
     if (!r.success) {
       const retryAfter = Math.max(1, Math.ceil((r.reset - Date.now()) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
       res.statusCode = 429;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ error: 'Too many requests' }));
       return false;
     }
     return true;
   } catch (e) {
     console.error('Rate limit error:', e);
-    // 捕获 Redis 连接错误
-    // 如果限流器崩溃，我们选择“安全打开”(fail-open)，允许请求通过
-    // 但在 Vercel 日志中打印一个严重错误
-    console.error("FATAL: Ratelimit connection failed. Check UPSTASH env vars.", e.message);
-    // 暂时允许请求通过，以免完全阻塞应用
-    return true; 
+    return true; // fail-open
   }
 }
 
-async function limitAuthLogin(req, res) {
-  return apply(rl.loginIp10m, getIP(req), res);
-}
-
+async function limitAuthLogin(req, res) { return apply(rl.loginIp10m, getIP(req), res); }
 async function limitAuthSendCode(req, res) {
-  // 确保 body 已被解析
   const email = (req.body?.email || '').toLowerCase().trim();
-  if (email) {
-    if (!await apply(rl.codeEmail10m, `em:${email}`, res)) return false;
-  }
+  if (email) { if (!await apply(rl.codeEmail10m, `em:${email}`, res)) return false; }
   return apply(rl.codeIp10m, `ip:${getIP(req)}`, res);
 }
-
-async function limitItemsWrite(req, res, userId) {
-  return apply(rl.writeUser10m, userId ? `u:${userId}` : `ip:${getIP(req)}`, res);
-}
-
-async function limitGlobal(req, res) {
-  return apply(rl.globalIp10m, `ip:${getIP(req)}`, res);
-}
+async function limitItemsWrite(req, res, userId) { return apply(rl.writeUser10m, userId ? `u:${userId}` : `ip:${getIP(req)}`, res); }
+async function limitGlobal(req, res) { return apply(rl.globalIp10m, `ip:${getIP(req)}`, res); }
 
 module.exports = { limitAuthLogin, limitAuthSendCode, limitItemsWrite, limitGlobal };

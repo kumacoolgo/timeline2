@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const { parseCookies, makeCookie, appendSetCookie } = require('./cookies');
 const { getOrigin, isWriteMethod } = require('./http');
 
-const CSRF_COOKIE = '__Host-csrf';
+// 本地用 'csrf'，生产用 '__Host-csrf'
+const CSRF_COOKIE = process.env.NODE_ENV === 'production' ? '__Host-csrf' : 'csrf';
 const CSRF_HEADER = 'x-csrf-token';
 const CSRF_TTL_SECONDS = 60 * 60 * 24; // 1 天
 
@@ -13,7 +14,7 @@ function ensureCsrfCookie(req, res) {
   if (!token) {
     token = crypto.randomBytes(32).toString('base64url');
     appendSetCookie(res, makeCookie(CSRF_COOKIE, token, {
-      httpOnly: false, // 允许前端读出
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Strict',
       path: '/',
@@ -29,7 +30,7 @@ function verifyCsrf(req) {
   const cookieToken = cookies[CSRF_COOKIE];
   const headerToken = req.headers[CSRF_HEADER] || req.headers['x-xsrf-token'];
   if (!cookieToken || !headerToken) return { ok: false, reason: 'missing_csrf' };
-  
+
   try {
     const a = Buffer.from(cookieToken);
     const b = Buffer.from(headerToken);
