@@ -4,8 +4,9 @@
   "private": true,
   "description": "费用时间轴 - 订阅/保修/保险可视化 & 提醒",
   "scripts": {
-    "dev": "vercel dev",
+    "build": "echo \"static app with serverless api\"",
     "start": "vercel dev",
+    "dev": "vercel dev",
     "lint": "echo \"no lint\""
   },
   "engines": {
