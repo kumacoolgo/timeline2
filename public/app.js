@@ -511,9 +511,12 @@ function buildStatsHTML(arr){
 
 // === API 封装（含 CSRF 与错误统一） ===
 function getCookie(name){
-  const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[-[\\]{}()*+?.,\\\\^$|#\\s]/g,'\\$&') + '=([^;]*)'));
+  // 用标准的正则转义：转义 . * + ? ^ $ { } ( ) | [ ] \
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + escaped + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : '';
 }
+
 function csrfToken(){ return getCookie('__Host-csrf') || getCookie('csrf'); }
 
 async function api(path, init){
