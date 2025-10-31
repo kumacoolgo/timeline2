@@ -1,20 +1,27 @@
 // api/_lib/http.js
-function getIP(req) {
-  const xf = req.headers['x-forwarded-for'] || '';
-  const first = xf.split(',').map(s => s.trim()).filter(Boolean)[0];
-  return first || req.headers['x-real-ip'] || req.socket?.remoteAddress || '0.0.0.0';
+function isWriteMethod(m = 'GET') {
+  const mm = String(m || '').toUpperCase();
+  return mm === 'POST' || mm === 'PUT' || mm === 'PATCH' || mm === 'DELETE';
 }
 
 function getOrigin(req) {
-  const o = req.headers['origin'] || null;
-  const ref = req.headers['referer'] || null;
+  const o = req.headers.origin || '';
   if (o) return o;
-  if (ref) { try { return new URL(ref).origin; } catch { /* ignore */ } }
-  return null;
+  // 有些情况下只有 referer
+  const ref = req.headers.referer || '';
+  try {
+    if (ref) return new URL(ref).origin;
+  } catch {}
+  return '';
 }
 
-function isWriteMethod(m) {
-  return ['POST', 'PUT', 'PATCH', 'DELETE'].includes((m || 'GET').toUpperCase());
+function getIP(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length) {
+    const first = xf.split(',')[0].trim();
+    return first || req.socket?.remoteAddress || '0.0.0.0';
+  }
+  return req.socket?.remoteAddress || '0.0.0.0';
 }
 
-module.exports = { getIP, getOrigin, isWriteMethod };
+module.exports = { isWriteMethod, getOrigin, getIP };

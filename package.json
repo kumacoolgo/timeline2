@@ -1,14 +1,19 @@
 {
-  "name": "expense-timeline-app",
+  "name": "expense-timeline",
   "version": "1.0.0",
-  "description": "A timeline-based expense and subscription tracker.",
   "private": true,
-  "dependencies": {
-    "@upstash/ratelimit": "^1.2.1",
-    "@upstash/redis": "^1.31.5",
-    "resend": "^3.4.0"
+  "description": "费用时间轴 - 订阅/保修/保险可视化 & 提醒",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev",
+    "lint": "echo \"no lint\""
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18 <21"
+  },
+  "dependencies": {
+    "@upstash/ratelimit": "^1.0.0",
+    "@upstash/redis": "^1.31.6",
+    "resend": "^4.0.0"
   }
 }
