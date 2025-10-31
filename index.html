@@ -35,28 +35,10 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;height:var(--row-h);gap:8px;margin-bottom:8px;cursor:grab}
 .item:active { cursor: grabbing; }
 .item.active{outline:2px solid var(--brand)} 
-
-.item > div:first-child {
-  min-width: 0;
-}
-
+.item > div:first-child { min-width: 0; }
 .item-line-1 { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
 .item-line-1 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-
-.item-line-1 .item-number { 
-  margin-left: auto; 
-  flex-shrink: 1;
-  font-size: 12px; 
-  color: var(--muted); 
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-
-.item-line-2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.item-line-3 { font-size: 12px; margin-top: 2px; }
+.item-line-1 .item-number { margin-left: auto; flex-shrink: 1; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 
 #gridHead{display:grid;gap:8px;margin-bottom:8px} #grid{display:grid;gap:8px}
 .cell{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px; position: relative;}
@@ -66,28 +48,19 @@ input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;ba
 .badge.amount-segment-1 { background:#eef5ff; border-color:#dbe8ff; } 
 .badge.amount-segment-2 { background:#fffbe6; border-color:#ffe58f; } 
 
-.cell.today-month {
-  background-color: #eef5ff;
-  border-color: #dbe8ff;
-}
+.cell.today-month { background-color: #eef5ff; border-color: #dbe8ff; }
 
 #dlg{position:fixed; inset:0; display:none; align-items:center; justify-content:center;background:rgba(0,0,0,.35); z-index:9999}
 #panel{width:min(680px,92vw); max-height:92vh; overflow:auto;background:#fff;border-radius:14px;padding:14px; box-shadow:0 12px 32px rgba(0,0,0,.18)}
 fieldset{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-top:6px}
 fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:8px;align-items:center;margin:6px 0}
-
 .row-fields input{width:100px} 
 .row-fields .m{width:60px}   
 .row-fields .a{width:80px}   
 .row-fields .fm{width:60px}  
 .row-fields .tm{width:60px}  
 
-.icon-btn {
-    display: flex; justify-content: center; align-items: center;
-    width: 30px; height: 30px; border: none; border-radius: 50%; 
-    font-size: 1.1rem; font-weight: bold; line-height: 1;
-    cursor: pointer; flex-shrink: 0; transition: background-color 0.2s;
-}
+.icon-btn { display: flex; justify-content: center; align-items: center; width: 30px; height: 30px; border: none; border-radius: 50%; font-size: 1.1rem; font-weight: bold; line-height: 1; cursor: pointer; flex-shrink: 0; transition: background-color 0.2s;}
 .delete-btn { background-color: #fff0f0; color: #d93025; border: 1px solid #f5c6cb; }
 .delete-btn:hover { background-color: #f8d7da; }
 .add-btn { background-color: #e6f7ff; color: #1890ff; border: 1px solid #b0dfff; }
@@ -96,17 +69,12 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 @media (max-width: 860px){
   #layout{grid-template-columns: 1fr}
   .row-fields{flex-wrap:wrap}
-  #phaseList .row-fields,
-  #cancelList .row-fields { flex-wrap: nowrap; }
+  #phaseList .row-fields, #cancelList .row-fields { flex-wrap: nowrap; }
   #leftWrap { max-height: 22vh; overflow-y: auto; padding-top: 4px; padding-left: 4px; padding-right: 6px; }
 }
-
 #dlgAuth .auth-view { display: none; }
 #dlgAuth .auth-view.active { display: block; }
-.link-btn {
-  background: none; border: none; color: var(--brand);
-  cursor: pointer; padding: 0; font-size: 12px; text-align: left;
-}
+.link-btn { background: none; border: none; color: var(--brand); cursor: pointer; padding: 0; font-size: 12px; text-align: left; }
 </style>
 </head>
 <body>
@@ -142,10 +110,10 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   </div>
 </div>
 
-<div id="dlg">
+<div id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
   <div id="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <h3 id="dlgTitle">编辑项目</h3><button id="btnClose" class="ghost">×</button>
+      <h3 id="dlgTitle">编辑项目</h3><button id="btnClose" class="ghost" aria-label="关闭">×</button>
     </div>
     
     <div class="row" style="gap:10px">
@@ -201,15 +169,15 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   </div>
 </div>
 
-<div id="dlgAuth" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;z-index:9999">
+<div id="dlgAuth" role="dialog" aria-modal="true" aria-labelledby="authTitle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;z-index:9999">
   <div class="card" style="width:min(520px,92vw);padding:14px">
-    
+    <h3 id="authTitle" class="sr-only" style="position:absolute;left:-9999px;top:-9999px">认证</h3>
     <div id="viewLogin" class="auth-view active">
       <h3>登录</h3>
       <div style="display:flex;flex-direction:column;gap:10px">
         <input id="login_em" placeholder="邮箱"/>
         <input id="login_pw" type="password" placeholder="密码"/>
-        <div id="login_msg" class="small" style="color:#ef4444"></div>
+        <div id="login_msg" class="small" style="color:#ef4444" aria-live="polite"></div>
         <div class="row" style="justify-content: space-between;">
           <button class="link-btn" id="btnGoReset" type="button">忘记密码？</button>
           <div>
@@ -230,7 +198,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
           <input id="reg_code" placeholder="6位验证码" style="flex: 1; min-width: 0;"/>
           <button id="btnSendRegCode" class="ghost" type="button">发送验证码</button>
         </div>
-        <div id="reg_msg" class="small" style="color:#ef4444"></div>
+        <div id="reg_msg" class="small" style="color:#ef4444" aria-live="polite"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button id="btnRegCancel" class="ghost" type="button">取消</button>
           <button id="btnGoLogin" class="ghost" type="button">返回登录</button>
@@ -248,7 +216,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
           <button id="btnSendResetCode" class="ghost" type="button">发送验证码</button>
         </div>
         <input id="reset_pw" type="password" placeholder="新密码（≥8位）"/>
-        <div id="reset_msg" class="small" style="color:#ef4444"></div>
+        <div id="reset_msg" class="small" style="color:#ef4444" aria-live="polite"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button id="btnResetCancel" class="ghost" type="button">取消</button>
           <button id="btnGoLoginReset" class="ghost" type="button">返回登录</button>
@@ -264,16 +232,31 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-const COL_W=110; 
+let COL_W = (window.innerWidth <= 400 ? 90 : 110);
+
 let allCloudItems = [];
 let items = []; 
 let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
 
+// ---- Date helpers (local, no timezone surprises) ----
 function pad2(n){return (n<10?'0':'')+n;} 
+function parseLocalDate(yyyy_mm_dd){
+  if(!yyyy_mm_dd) return new Date();
+  const [y,m,d] = String(yyyy_mm_dd).split('-').map(Number);
+  return new Date(y, (m||1)-1, d||1);
+}
 function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} 
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
 function MaxDate(d1, d2) { return d1 > d2 ? d1 : d2; }
+function monthsBetween(a,b){ return (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth()); }
+
+// ---- UI helpers ----
+function escapeHTML(s){ return String(s||'').replace(/[&<>"'\/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'}[c])); }
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )'+name.replace(/([.$?*|{}()\\[\\]\\\\\\/\\+^])/g,'\\$1')+'=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : '';
+}
 
 function syncTypeUI(){ 
   const t=$('#f_type').value; 
@@ -282,9 +265,46 @@ function syncTypeUI(){
   $('#subBlockInsurance').style.display=(t==='insurance')?'block':'none';
 }
 
-function addPhase(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>日元/月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#phaseList').appendChild(d)}
-function addCancel(i){const d=document.createElement('div');d.className='row-fields';d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;d.querySelector('.del').onclick=()=>d.remove();$('#cancelList').appendChild(d)}
+function addPhase(i){
+  const d=document.createElement('div');
+  d.className='row-fields';
+  d.innerHTML=`<span class=small>第</span><input class=m type="number" min=1 value="${i?.fromMonth||1}"><span class=small>个月起</span><input class=a type="number" value="${i?.amount||0}"><span class=small>￥/月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;
+  d.querySelector('.del').onclick=()=>d.remove();
+  $('#phaseList').appendChild(d);
+}
+function addCancel(i){
+  const d=document.createElement('div');
+  d.className='row-fields';
+  d.innerHTML=`<span class=small>第</span><input class=fm type="number" min=1 value="${i?.fromMonth||1}"><span class=small>-</span><input class=tm type="number" min=1 value="${i?.toMonth||1}"><span class=small>个月</span><button class="icon-btn delete-btn del" type="button">➖</button>`;
+  d.querySelector('.del').onclick=()=>d.remove();
+  $('#cancelList').appendChild(d);
+}
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
+
+function validateForm(model) {
+  const errs = [];
+  if (!model.name?.trim()) errs.push('请填写项目名称');
+  if (!model.startDate) errs.push('请选择开始日期');
+
+  if (model.type === 'warranty') {
+    if (model.warrantyMonths < 0) errs.push('保修期不能为负');
+  } else {
+    if (!model.pricePhases?.length) errs.push('至少设置一个金额阶段');
+    const months = new Set();
+    model.pricePhases.forEach(p => {
+      if (p.fromMonth < 1) errs.push('金额阶段起始月需 ≥ 1');
+      if (!(p.amount >= 0)) errs.push('金额必须为非负数');
+      if (months.has(p.fromMonth)) errs.push(`金额阶段第 ${p.fromMonth} 月重复`);
+      months.add(p.fromMonth);
+    });
+    model.cancelWindows?.forEach(w => {
+      if (w.fromMonth < 1 || w.toMonth < 1 || w.toMonth < w.fromMonth) errs.push('退会区间不合法');
+    });
+    const term = (Number(model.policyTermYears)||0) * 12 + (Number(model.policyTermMonths)||0);
+    if (model.type === 'insurance' && term === 0) errs.push('请设置非零保期');
+  }
+  return errs;
+}
 
 function readForm(){ 
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
@@ -295,13 +315,16 @@ function readForm(){
   } 
   const phases=[...$$('#phaseList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.m').value)||1,amount:Number(r.querySelector('input.a').value)||0})).sort((a,b)=>a.fromMonth-b.fromMonth); 
   const cancels=[...$$('#cancelList .row-fields')].map(r=>({fromMonth:Number(r.querySelector('.fm').value)||1,toMonth:Number(r.querySelector('.tm').value)||1})); 
-  return {
+  const model = {
     id:editingId||undefined, ...base,
     billingDay:Number($('#f_bill').value)||1,
     pricePhases:phases, cancelWindows:cancels,
     policyTermYears: Number($('#f_ins_y').value) || 0,
     policyTermMonths: Number($('#f_ins_m').value) || 0
   }; 
+  const errs = validateForm(model);
+  if (errs.length) { alert(errs[0]); return null; }
+  return model;
 }
 
 function fillForm(it){ 
@@ -320,7 +343,12 @@ function fillForm(it){
   syncTypeUI(); 
 }
 
-function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a } 
+function resolvePlanPrice(ph,idx){ 
+  if(!ph?.length) return null; 
+  let a=null; 
+  [...ph].sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount });
+  return a;
+} 
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
@@ -328,230 +356,70 @@ function scrollToToday(behavior = 'smooth') {
   const today = new Date();
   const ym = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
   const gridContainer = $('#gridContainer');
-  const todayCellHead = $(`#gridHead [data-ym="${ym}"]`);
-  
-  if (todayCellHead) {
-    // 滚动到最左侧, 留 10px 边距
-    const targetScroll = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
-    gridContainer.scrollTo({ left: Math.max(0, targetScroll), behavior: behavior });
-  } else {
-    console.warn('Today is not in the rendered range.');
-  }
+  const el = $(`#gridHead [data-ym="${ym}"]`);
+  if (!el) return;
+  const containerRect = gridContainer.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const delta = elRect.left - containerRect.left;
+  const target = gridContainer.scrollLeft + delta - 10;
+  gridContainer.scrollTo({ left: Math.max(0, target), behavior });
+}
+
+function renderLeftList() {
+  const L=$('#leftWrap');
+  L.innerHTML = '';
+  items.forEach(it => {
+    const wrap = document.createElement('div');
+    wrap.className = `item ${it.id===activeId?'active':''}`;
+    wrap.dataset.id = it.id;
+    const left = document.createElement('div');
+    const line1 = document.createElement('div'); line1.className = 'title item-line-1';
+    const name = document.createElement('span'); name.textContent = it.name || '';
+    const type = document.createElement('span'); type.className = 'small';
+    if (it.type === 'plan') { type.style.color = '#6b5cff'; type.textContent = '套餐'; }
+    else if (it.type === 'insurance') { type.style.color='#10b981'; type.textContent='保险'; }
+    else { type.style.color='#3b82f6'; type.textContent='保修'; }
+    const num = document.createElement('span'); num.className = 'meta item-number'; num.textContent = (it.number ? '#'+it.number : '#-');
+    line1.append(name, type, num);
+
+    const line2 = document.createElement('div'); line2.className = 'meta item-line-2';
+    line2.textContent = `开始: ${it.startDate||'-'}`;
+
+    const line3 = document.createElement('div'); line3.className = 'meta item-line-3';
+    if (it.type === 'warranty' && it.warrantyMonths) line3.textContent = `保修期 ${it.warrantyMonths} 个月`;
+    else if (it.type === 'plan' && it.cancelWindows?.length) {
+      const w = it.cancelWindows[0];
+      line3.textContent = `退会期 第 ${w.fromMonth}～${w.toMonth||w.fromMonth} 个月`;
+    } else if (it.type === 'insurance') {
+      const y = it.policyTermYears || 0, m = it.policyTermMonths || 0;
+      const term = `${y>0?y+'年':''}${m>0?m+'个月':''}`;
+      if (term) line3.textContent = `保期 ${term}`;
+    }
+    left.append(line1, line2, line3);
+
+    const ops = document.createElement('div'); ops.className = 'ops';
+    const btn = document.createElement('button'); btn.className='ghost btnEdit'; btn.type='button'; btn.textContent='编辑';
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); const it2=allCloudItems.find(x=>x.id===it.id); editingId=it2.id; fillForm(it2); $('#dlgTitle').textContent='编辑项目'; $('#btnDeleteInDialog').style.display='inline-block'; $('#dlg').style.display='flex'; });
+    ops.appendChild(btn);
+
+    wrap.append(left, ops);
+    wrap.addEventListener('click', (e)=>{ if(e.target.closest('button')) return; activeId = it.id; render(); });
+    L.appendChild(wrap);
+  });
 }
 
 function render(){ 
-  // --- 1. 执行过滤 ---
+  // 1) 过滤
   const term = $('#filter').value.trim().toLowerCase();
-  if (!term) {
-    items = [...allCloudItems]; 
-  } else {
-    items = allCloudItems.filter(it => { 
-      return (it.name && it.name.toLowerCase().includes(term)) ||
-             (it.type && it.type.toLowerCase().includes(term)) ||
-             (it.number && it.number.toLowerCase().includes(term));
-    });
-  }
-  if (!items.find(it => it.id === activeId)) {
-    activeId = items[0]?.id || null;
-  }
-  
-  // --- 2. 渲染左侧列表 ---
+  if (!term) items = [...allCloudItems];
+  else items = allCloudItems.filter(it => (it.name&&it.name.toLowerCase().includes(term))||(it.type&&it.type.toLowerCase().includes(term))||(it.number&&it.number.toLowerCase().includes(term)));
+  if (!items.find(it => it.id === activeId)) activeId = items[0]?.id || null;
+
+  // 2) 左侧列表
+  if (sortableList) { sortableList.destroy(); sortableList = null; }
+  renderLeftList();
+
   const L=$('#leftWrap');
-  if(sortableList) {
-    sortableList.destroy();
-    sortableList = null;
-  }
-  
-  L.innerHTML = items.map(it => { 
-    const typeLabel = it.type === 'plan' ? '<span class="small" style="color:#6b5cff">套餐</span>' :
-                    it.type === 'insurance' ? '<span class="small" style="color:#10b981">保险</span>' :
-                    '<span class="small" style="color:#3b82f6">保修</span>';
-    
-    let subDetail = '';
-    if (it.type === 'warranty') {
-      if (it.warrantyMonths) subDetail = `<span class="small" style="color:#3b82f6">保修期 ${it.warrantyMonths} 个月</span>`;
-    } else if (it.type === 'plan') {
-      if (it.cancelWindows && it.cancelWindows.length > 0) subDetail = `<span class="small" style="color:#6b5cff">退会期 第 ${it.cancelWindows[0].fromMonth} 个月</span>`;
-    } else if (it.type === 'insurance') {
-      const y = it.policyTermYears || 0;
-      const m = it.policyTermMonths || 0;
-      let termStr = '';
-      if (y > 0) termStr += `${y}年`;
-      if (m > 0) termStr += `${m}个月`;
-      if (termStr) subDetail = `<span class="small" style="color:#10b981">保期 ${termStr}</span>`;
-    }
-
-    return `<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}">
-      <div>
-        <div class="title item-line-1">
-          <span>${it.name}</span>
-          ${typeLabel}
-          <span class="meta item-number">#${it.number||'-'}</span>
-        </div>
-        <div class="meta item-line-2">
-          <span>开始: ${it.startDate||'-'}</span>
-        </div>
-        <div class="meta item-line-3">
-          ${subDetail} </div>
-      </div>
-      <div class="ops">
-        <button class="ghost btnEdit" data-id="${it.id}" type="button">编辑</button>
-      </div>
-    </div>`;
-  }).join(''); 
-  
-  L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
-  
-  L.querySelectorAll('.btnEdit').forEach(b=> b.onclick=e=>{
-    e.stopPropagation(); 
-    const it=allCloudItems.find(x=>x.id===b.dataset.id); 
-    editingId=it.id; 
-    fillForm(it); 
-    $('#dlgTitle').textContent='编辑项目'; 
-    $('#btnDeleteInDialog').style.display = 'inline-block'; // <-- 【新增】显示删除按钮
-    $('#dlg').style.display='flex';
-  }); 
-  
-  // --- 3. 渲染右侧时间轴 ---
-  const data=visibleItems(); const head=$('#gridHead'),grid=$('#grid'); 
-  
-  if (!data.length){ 
-    head.innerHTML=''; 
-    grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; 
-    return; 
-  } 
-  
-  const it = data[0]; 
-  
-  // --- 【修改】自动计算时间轴起止点 ---
-  const minStart = startOfMonth(new Date(it.startDate || new Date()));
-  const today = new Date();
-  const todayPlusOneYear = addMonths(today, 12);
-  let maxEndCandidate = MaxDate(todayPlusOneYear, minStart);
-  const itemStartDate = new Date(it.startDate);
-  
-  if (it.type === 'plan' || it.type === 'insurance') {
-    if (it.pricePhases && it.pricePhases.length > 0) {
-      const lastPhase = it.pricePhases.sort((a,b) => b.fromMonth - a.fromMonth)[0];
-      const lastPhaseMonth = (lastPhase.fromMonth || 1) - 1;
-      const lastPhaseDate = addMonths(itemStartDate, lastPhaseMonth);
-      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastPhaseDate, 12));
-    }
-    if (it.cancelWindows && it.cancelWindows.length > 0) {
-      const lastWindow = it.cancelWindows.sort((a,b) => b.toMonth - a.toMonth)[0];
-      const lastWindowMonth = (lastWindow.toMonth || 1) - 1; 
-      const lastWindowDate = addMonths(itemStartDate, lastWindowMonth);
-      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastWindowDate, 12));
-    }
-    if (it.type === 'insurance') {
-      const policyMonths = (Number(it.policyTermYears) || 0) * 12 + (Number(it.policyTermMonths) || 0);
-      if (policyMonths > 0) {
-        const policyEndDate = addMonths(itemStartDate, policyMonths);
-        maxEndCandidate = MaxDate(maxEndCandidate, addMonths(policyEndDate, 12));
-      }
-    }
-  } else if (it.type === 'warranty') {
-    const warrantyMonths = Number(it.warrantyMonths) || 0;
-    if (warrantyMonths > 0) {
-      const warrantyEndDate = addMonths(itemStartDate, warrantyMonths);
-      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(warrantyEndDate, 12));
-    }
-  }
-  
-  let maxEnd = startOfMonth(maxEndCandidate);
-  // --- 自动计算结束 ---
-  
-  const mlist=[];
-  let currentMonth = new Date(minStart);
-  while (currentMonth <= maxEnd) {
-    mlist.push(new Date(currentMonth));
-    currentMonth = addMonths(currentMonth, 1);
-  }
-  
-  head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
-  
-  const todayY = today.getFullYear();
-  const todayM = today.getMonth();
-  const todayD = today.getDate();
-
-  head.innerHTML=mlist.map(m=>{
-    const q=Math.ceil((m.getMonth()+1)/3); 
-    const ym = `${m.getFullYear()}-${pad2(m.getMonth() + 1)}`;
-    const mYear = m.getFullYear();
-    const mMonth = m.getMonth();
-    const isTodayMonth = mYear === todayY && mMonth === todayM;
-    const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-    const totalCols = daysInMonth + 2; 
-    const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
-
-    return `<div class="cell nowrap ${isTodayMonth ? 'today-month' : ''}" data-ym="${ym}" style="text-align:center; ${gridStyle}">
-      <div style="grid-column: 1 / -1; z-index: 5;">
-        <div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div>
-        <div class=small>Q${q}</div>
-      </div>
-      ${''}
-    </div>`;
-  }).join(''); 
-  
-  grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
-  const m0=startOfMonth(new Date(it.startDate)); 
-  const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
-  
-  const cells=[]; 
-  for(let i=0;i<mlist.length;i++){ 
-    const idx=MonthIndex(mlist[i]); 
-    const m = mlist[i];
-    const mYear = m.getFullYear();
-    const mMonth = m.getMonth();
-    const isTodayMonth = mYear === todayY && mMonth === todayM;
-    const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-    const totalCols = daysInMonth + 2; 
-    const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
-    const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
-    const contentDivEnd = `</div>`;
-
-    if(it.type==='warranty'){ 
-      const warrantyMonths = Number(it.warrantyMonths || 0);
-      let warrantyBadge = ''; 
-      if (idx >= 1 && idx <= warrantyMonths) {
-        warrantyBadge = '<span class="badge">保修中</span>';
-      } else if (idx > warrantyMonths && warrantyMonths > 0) { 
-        warrantyBadge = '<span class="badge cancel">保修外</span>';
-      }
-
-      // 【修改】添加 'today-month' class, 移除 todayLine
-      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
-        ${contentDivStart}
-          ${warrantyBadge} 
-        ${contentDivEnd}
-        ${''}
-      </div>`); 
-    }else{ 
-      const amount=resolvePlanPrice(it.pricePhases,idx); 
-      const cancel=isInCancel(it.cancelWindows,idx); 
-      let amountBadgeClass = '';
-      if (amount != null) {
-        const sortedPhases = (it.pricePhases || []).filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
-        let segmentIndex = 0;
-        for (let j = 0; j < sortedPhases.length; j++) {
-          if (idx >= sortedPhases[j].fromMonth) {
-            segmentIndex = j;
-          }
-        }
-        amountBadgeClass = (segmentIndex % 2 === 0) ? 'amount-segment-1' : 'amount-segment-2';
-      }
-      
-      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
-        ${contentDivStart}
-          ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${amount.toLocaleString()}</div>`:''}
-          ${cancel?'<div class="badge cancel">退会期</div>':''}
-        ${contentDivEnd}
-        ${''}
-      </div>`); 
-    } 
-  } 
-  grid.innerHTML=cells.join(''); 
-
   sortableList = new Sortable(L, {
     animation: 150,
     handle: '.item', 
@@ -572,7 +440,7 @@ function render(){
           updates.push(api(`/api/items?id=${it.id}`, {
             method: 'PUT',
             headers: {'content-type': 'application/json'},
-            body: JSON.stringify({ order: newOrder }) 
+            body: JSON.stringify({ ...it, order: newOrder }) 
           }));
         }
       });
@@ -585,44 +453,128 @@ function render(){
       }
     }
   });
+
+  // 3) 右侧时间轴
+  const head=$('#gridHead'),grid=$('#grid'); 
+  const data = activeId ? items.filter(i => i.id===activeId) : [];
+  if (!data.length){ 
+    head.innerHTML=''; 
+    grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; 
+    return; 
+  } 
+  const it = data[0]; 
+  const minStart = startOfMonth(parseLocalDate(it.startDate || new Date()));
+  const today = new Date();
+  const todayPlusOneYear = addMonths(today, 12);
+  let maxEndCandidate = MaxDate(todayPlusOneYear, minStart);
+  const itemStartDate = parseLocalDate(it.startDate);
+
+  if (it.type === 'plan' || it.type === 'insurance') {
+    if (it.pricePhases && it.pricePhases.length > 0) {
+      const lastPhase = [...it.pricePhases].sort((a,b) => b.fromMonth - a.fromMonth)[0];
+      const lastPhaseMonth = (lastPhase.fromMonth || 1) - 1;
+      const lastPhaseDate = addMonths(itemStartDate, lastPhaseMonth);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastPhaseDate, 12));
+    }
+    if (it.cancelWindows && it.cancelWindows.length > 0) {
+      const lastWindow = [...it.cancelWindows].sort((a,b) => b.toMonth - a.toMonth)[0];
+      const lastWindowMonth = (lastWindow.toMonth || 1) - 1; 
+      const lastWindowDate = addMonths(itemStartDate, lastWindowMonth);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastWindowDate, 12));
+    }
+    if (it.type === 'insurance') {
+      const policyMonths = (Number(it.policyTermYears) || 0) * 12 + (Number(it.policyTermMonths) || 0);
+      if (policyMonths > 0) {
+        const policyEndDate = addMonths(itemStartDate, policyMonths);
+        maxEndCandidate = MaxDate(maxEndCandidate, addMonths(policyEndDate, 12));
+      }
+    }
+  } else if (it.type === 'warranty') {
+    const warrantyMonths = Number(it.warrantyMonths) || 0;
+    if (warrantyMonths > 0) {
+      const warrantyEndDate = addMonths(itemStartDate, warrantyMonths);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(warrantyEndDate, 12));
+    }
+  }
+  const maxEnd = startOfMonth(maxEndCandidate);
+
+  const mlist=[];
+  let currentMonth = new Date(minStart);
+  while (currentMonth <= maxEnd) { mlist.push(new Date(currentMonth)); currentMonth = addMonths(currentMonth, 1); }
+  head.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
+  grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
+
+  const todayY = today.getFullYear(), todayM = today.getMonth();
+  head.innerHTML=mlist.map(m=>{
+    const q=Math.ceil((m.getMonth()+1)/3); 
+    const ym = `${m.getFullYear()}-${pad2(m.getMonth() + 1)}`;
+    const isTodayMonth = m.getFullYear() === todayY && m.getMonth() === todayM;
+    return `<div class="cell nowrap ${isTodayMonth ? 'today-month' : ''}" data-ym="${ym}" style="text-align:center;">
+      <div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div>
+      <div class=small>Q${q}</div>
+    </div>`;
+  }).join(''); 
   
-  setTimeout(() => {
-    scrollToToday('auto'); 
-  }, 0);
+  const m0=startOfMonth(parseLocalDate(it.startDate)); 
+  const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
+  
+  const cells=[]; 
+  for(let i=0;i<mlist.length;i++){ 
+    const idx=MonthIndex(mlist[i]); 
+    const m = mlist[i];
+    const isTodayMonth = m.getFullYear() === todayY && m.getMonth() === todayM;
+    if(it.type==='warranty'){ 
+      const warrantyMonths = Number(it.warrantyMonths || 0);
+      let warrantyBadge = ''; 
+      if (idx >= 1 && idx <= warrantyMonths) {
+        warrantyBadge = '<span class="badge">保修中</span>';
+      } else if (idx > warrantyMonths && warrantyMonths > 0) { 
+        warrantyBadge = '<span class="badge cancel">保修外</span>';
+      }
+      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center;">${warrantyBadge}</div>`); 
+    }else{ 
+      const amount=resolvePlanPrice(it.pricePhases,idx); 
+      const cancel=isInCancel(it.cancelWindows,idx); 
+      let amountBadgeClass = '';
+      if (amount != null) {
+        const sortedPhases = (it.pricePhases || []).filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
+        let segmentIndex = 0;
+        for (let j = 0; j < sortedPhases.length; j++) {
+          if (idx >= sortedPhases[j].fromMonth) segmentIndex = j;
+        }
+        amountBadgeClass = (segmentIndex % 2 === 0) ? 'amount-segment-1' : 'amount-segment-2';
+      }
+      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center;">
+        ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${Number(amount).toLocaleString()}</div>`:''}
+        ${cancel?'<div class="badge cancel">退会期</div>':''}
+      </div>`); 
+    } 
+  } 
+  grid.innerHTML=cells.join(''); 
+
+  setTimeout(() => { scrollToToday('auto'); }, 0);
 }
 $('#f_type').onchange=syncTypeUI; 
 
 $('#btnAdd').onclick=()=>{ 
-  editingId=null; 
-  fillForm(null); 
-  $('#dlgTitle').textContent='新增项目'; 
-  $('#btnDeleteInDialog').style.display = 'none';
-  $('#dlg').style.display='flex'; 
+  editingId=null; fillForm(null); $('#dlgTitle').textContent='新增项目'; $('#btnDeleteInDialog').style.display='none'; $('#dlg').style.display='flex'; 
+  setTimeout(()=>$('#f_name').focus(), 0);
 }; 
-
 $('#btnClose').onclick=()=>$('#dlg').style.display='none'; 
 $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; 
 $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ if($('#dlg').style.display==='flex') $('#dlg').style.display='none'; if($('#dlgAuth').style.display==='flex') $('#dlgAuth').style.display='none'; }});
 
 $('#btnSave').onclick= async ()=>{ 
   const it = readForm(); 
   if(!it) return;
-  
   $('#btnSave').disabled = true;
   try {
     if (editingId) {
       const updatedItem = { ...it, id: editingId }; 
-      await api('/api/items?id=' + editingId, {
-        method: 'PUT',
-        headers: {'content-type': 'application/json'},
-        body: JSON.stringify(updatedItem)
-      });
+      await api('/api/items?id=' + encodeURIComponent(editingId), { method: 'PUT', headers: {'content-type': 'application/json'}, body: JSON.stringify(updatedItem) });
     } else {
-      await api('/api/items', {
-        method: 'POST',
-        headers: {'content-type': 'application/json'},
-        body: JSON.stringify(it)
-      });
+      await api('/api/items', { method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(it) });
     }
     $('#dlg').style.display='none';
     await loadCloudItems(); 
@@ -634,40 +586,41 @@ $('#btnSave').onclick= async ()=>{
 };
 
 $('#btnDeleteInDialog').onclick = async () => {
-  if (!editingId) return; // 安全检查
+  if (!editingId) return;
   if (!confirm('确定要删除该项目吗？此操作无法撤销。')) return;
-
   const b = $('#btnDeleteInDialog');
   b.disabled = true;
   try {
-    await api('/api/items?id=' + editingId, { method: 'DELETE' });
-    $('#dlg').style.display='none'; // 关闭弹窗
-    await loadCloudItems(); // 重新加载列表
+    await api('/api/items?id=' + encodeURIComponent(editingId), { method: 'DELETE' });
+    $('#dlg').style.display='none';
+    await loadCloudItems();
   } catch (e) {
     alert('删除失败: ' + e.message);
-  } finally {
-    b.disabled = false;
-  }
+  } finally { b.disabled = false; }
 };
 
-$('#btnToday').onclick = async () => {
-  scrollToToday('smooth');
-};
-
+$('#btnToday').onclick = () => scrollToToday('smooth');
 $('#btnSearch').onclick = () => render();
-$('#btnClearSearch').onclick = () => {
-  $('#filter').value = ''; 
-  render(); 
-};
-$('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
+$('#btnClearSearch').onclick = () => { $('#filter').value = ''; render(); };
+let searchTimer=null; $('#filter').addEventListener('input', ()=>{ clearTimeout(searchTimer); searchTimer=setTimeout(render,300); });
+$('#filter').addEventListener('keyup', (e)=>{ if(e.key==='Enter') render(); });
 
-// 认证 API
-async function api(path, init){
-  const r = await fetch(path, { credentials:'include', ...init });
+// --- API helper with CSRF header ---
+function pathnameOf(p){ try{ return new URL(p, location.origin).pathname; }catch{ return p; } }
+const AUTH_PATHS = new Set(['/api/login','/api/register','/api/register-send-code','/api/password-reset-send-code','/api/password-reset-confirm','/api/me']);
+
+async function api(path, init={}){
+  const m = (init.method || 'GET').toUpperCase();
+  const headers = Object.assign({}, init.headers || {});
+  if (m !== 'GET' && m !== 'HEAD') {
+    const token = getCookie('csrf');
+    if (token) headers['x-csrf-token'] = token;
+  }
+  const r = await fetch(path, { credentials:'include', ...init, headers });
   const text = await r.text();
   let data; try{ data = JSON.parse(text||'{}') }catch{ data = { error:text||'网络错误' } }
   if(!r.ok){
-    const isAuthPath = ['/api/login', '/api/register', '/api/register-send-code', '/api/password-reset-send-code', '/api/password-reset-confirm'].includes(path);
+    const isAuthPath = AUTH_PATHS.has(pathnameOf(path));
     if (r.status === 401 && !isAuthPath) {
       ONLINE = false;
       $('#btnUser').textContent = '登录/注册';
@@ -680,20 +633,12 @@ async function api(path, init){
   return data;
 }
 
-// 认证弹窗逻辑
+// --- Auth dialog ---
 const DlgAuth = {
   el: $('#dlgAuth'),
-  views: {
-    login: $('#viewLogin'),
-    register: $('#viewRegister'),
-    reset: $('#viewReset'),
-  },
-  msgs: {
-    login: $('#login_msg'),
-    register: $('#reg_msg'),
-    reset: $('#reset_msg'),
-  },
-  show(viewName = 'login') { this.switchView(viewName); this.el.style.display = 'flex'; },
+  views: { login: $('#viewLogin'), register: $('#viewRegister'), reset: $('#viewReset') },
+  msgs: { login: $('#login_msg'), register: $('#reg_msg'), reset: $('#reset_msg') },
+  show(viewName = 'login') { this.switchView(viewName); this.el.style.display = 'flex'; setTimeout(()=>$('#login_em').focus(),0); },
   hide() { this.el.style.display = 'none'; },
   switchView(viewName) {
     Object.values(this.views).forEach(v => v.classList.remove('active'));
@@ -701,28 +646,21 @@ const DlgAuth = {
     if (this.views[viewName]) this.views[viewName].classList.add('active');
   },
   showMsg(view, message, isError = true) {
-    if (this.msgs[view]) {
-      this.msgs[view].textContent = message;
-      this.msgs[view].style.color = isError ? '#ef4444' : '#16a34a';
-    }
+    if (this.msgs[view]) { this.msgs[view].textContent = message; this.msgs[view].style.color = isError ? '#ef4444' : '#16a34a'; }
   },
   startCountdown(btn) {
-    let seconds = 60;
-    btn.disabled = true;
+    let seconds = 60; btn.disabled = true;
     const originalText = btn.textContent;
     btn.textContent = `重新发送 (${seconds}s)`;
     const interval = setInterval(() => {
       seconds--;
-      if (seconds <= 0) {
-        clearInterval(interval); btn.textContent = originalText; btn.disabled = false;
-      } else {
-        btn.textContent = `重新发送 (${seconds}s)`;
-      }
+      if (seconds <= 0) { clearInterval(interval); btn.textContent = originalText; btn.disabled = false; }
+      else { btn.textContent = `重新发送 (${seconds}s)`; }
     }, 1000);
   }
 };
 
-// 认证按钮绑定
+// --- Auth buttons ---
 $('#btnUser').onclick = () => {
   $('#login_em').value = ''; $('#login_pw').value = '';
   $('#reg_em').value = ''; $('#reg_pw').value = ''; $('#reg_code').value = '';
@@ -749,12 +687,11 @@ $('#btnSendRegCode').onclick = async () => {
   if (!email) { DlgAuth.showMsg('register', '请输入邮箱'); return; }
   btn.disabled = true; DlgAuth.showMsg('register', '发送中...', false);
   try {
-    const data = await api('/api/register-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
+    const data = await api('/api/register-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
     DlgAuth.showMsg('register', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn); 
   } catch (e) {
-    DlgAuth.showMsg('register', e.message || '发送失败');
-    btn.disabled = false; 
+    DlgAuth.showMsg('register', e.message || '发送失败'); btn.disabled = false; 
   }
 };
 
@@ -766,9 +703,7 @@ $('#goReg').onclick = async () => {
     const code = $('#reg_code').value.trim();
     await api('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password, code }) });
     DlgAuth.showMsg('register', '注册成功，请返回登录', false);
-  } catch (e) {
-    DlgAuth.showMsg('register', e.message || '注册失败');
-  } finally { b.disabled = false; }
+  } catch (e) { DlgAuth.showMsg('register', e.message || '注册失败'); } finally { b.disabled = false; }
 };
 
 $('#goLogin').onclick = async () => {
@@ -781,9 +716,7 @@ $('#goLogin').onclick = async () => {
     $('#btnLogout').style.display = 'inline-block';
     DlgAuth.hide();
     await loadCloudItems();
-  } catch (e) {
-    DlgAuth.showMsg('login', e.message || '登录失败');
-  } finally { b.disabled = false; }
+  } catch (e) { DlgAuth.showMsg('login', e.message || '登录失败'); } finally { b.disabled = false; }
 };
 
 $('#btnSendResetCode').onclick = async () => {
@@ -792,13 +725,10 @@ $('#btnSendResetCode').onclick = async () => {
   if (!email) { DlgAuth.showMsg('reset', '请输入注册邮箱'); return; }
   btn.disabled = true; DlgAuth.showMsg('reset', '发送中...', false);
   try {
-    const data = await api('/api/password-reset-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
+    const data = await api('/api/password-reset-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
     DlgAuth.showMsg('reset', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn);
-  } catch (e) {
-    DlgAuth.showMsg('reset', e.message || '发送失败');
-    btn.disabled = false;
-  }
+  } catch (e) { DlgAuth.showMsg('reset', e.message || '发送失败'); btn.disabled = false; }
 };
 
 $('#goReset').onclick = async () => {
@@ -809,22 +739,16 @@ $('#goReset').onclick = async () => {
     const newPassword = $('#reset_pw').value;
     await api('/api/password-reset-confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, code, newPassword }) });
     DlgAuth.showMsg('reset', '密码重置成功，请返回登录', false);
-  } catch (e) {
-    DlgAuth.showMsg('reset', e.message || '重置失败');
-  } finally { b.disabled = false; }
+  } catch (e) { DlgAuth.showMsg('reset', e.message || '重置失败'); } finally { b.disabled = false; }
 };
 
 async function loadCloudItems() {
   try {
     allCloudItems = await api('/api/items'); 
     allCloudItems.sort((a, b) => (a.order || 0) - (b.order || 0));
-    if (allCloudItems.length > 0 && !allCloudItems.find(it => it.id === activeId)) {
-      activeId = allCloudItems[0].id;
-    }
+    if (allCloudItems.length > 0 && !allCloudItems.find(it => it.id === activeId)) activeId = allCloudItems[0].id;
     render(); 
-  } catch (e) {
-    alert('加载数据失败: ' + e.message);
-  }
+  } catch (e) { alert('加载数据失败: ' + e.message); }
 }
 
 async function checkLogin() {
@@ -837,14 +761,10 @@ async function checkLogin() {
   } catch (e) {
     ONLINE = false;
     $('#btnUser').textContent = '登录/注册';
-    DlgAuth.show('login'); 
+    // 不强弹登录，允许匿名静态体验（但没有数据）
   }
 }
-
-function bootstrap(){ 
-  checkLogin(); 
-}
+function bootstrap(){ checkLogin(); }
 bootstrap();
-
 </script>
 </body></html>

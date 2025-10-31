@@ -1,0 +1,14 @@
+# Dependencies
+node_modules
+
+# Vercel
+.vercel
+
+# Environment
+.env
+.env.*
+*.env
+
+# OS
+.DS_Store
+Thumbs.db

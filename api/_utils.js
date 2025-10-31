@@ -1,23 +1,38 @@
-// api/_utils.js
+
+// api/_utils.js (hardened)
 const crypto = require('crypto');
+
+// --- Environment variables (do NOT log them) ---
 const UPSTASH_REDIS_REST_URL   = process.env.UPSTASH_REDIS_REST_URL   || process.env.UPSTASH_REST_URL;
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_REST_TOKEN;
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
-const VERIFY_CODE_TTL_SECONDS = 60 * 10; // 验证码10分钟有效期
-
-// --- 【重要】Resend 配置 ---
-// 1. 引入 Resend 库
-const { Resend } = require('resend');
-
-// 2. 从 Vercel 环境变量中安全地读取 Key 和发件人
+const VERIFY_CODE_TTL_SECONDS = 60 * 10; // 10 minutes
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const EMAIL_FROM = process.env.EMAIL_FROM;
 
-// 3. 初始化 Resend 客户端
-//    如果环境变量没设置，resend 会是 null
+// --- Resend ---
+const { Resend } = require('resend');
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
-// --- Resend 配置结束 ---
 
+// --- Basic helpers ---
+function appendSetCookie(res, v) {
+  const prev = res.getHeader('set-cookie');
+  if (!prev) res.setHeader('set-cookie', v);
+  else if (Array.isArray(prev)) res.setHeader('set-cookie', prev.concat(v));
+  else res.setHeader('set-cookie', [prev, v]);
+}
+function setCookie(res, name, value, opt = {}) {
+  const a = [`${name}=${encodeURIComponent(value)}`];
+  if (opt.maxAge) a.push(`Max-Age=${opt.maxAge}`);
+  a.push('Path=/', 'SameSite=Lax', 'HttpOnly', 'Secure');
+  appendSetCookie(res, a.join('; '));
+}
+function setCookiePublic(res, name, value, opt = {}) {
+  const a = [`${name}=${encodeURIComponent(value)}`];
+  if (opt.maxAge) a.push(`Max-Age=${opt.maxAge}`);
+  a.push('Path=/', 'SameSite=Lax', 'Secure');
+  appendSetCookie(res, a.join('; '));
+}
 
 function json(res, obj, code=200) {
   res.statusCode = code;
@@ -25,9 +40,16 @@ function json(res, obj, code=200) {
   res.end(JSON.stringify(obj));
 }
 
-async function readBody(req) {
+async function readBody(req, {max=1_000_000} = {}) {
+  const ctype = String(req.headers['content-type'] || '');
+  if (!/application\/json\b/i.test(ctype)) return {};
   const chunks = [];
-  for await (const c of req) chunks.push(c);
+  let size = 0;
+  for await (const c of req) {
+    size += c.length;
+    if (size > max) throw new Error('Payload Too Large');
+    chunks.push(c);
+  }
   const raw = Buffer.concat(chunks).toString();
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
@@ -42,13 +64,7 @@ function parseCookies(req) {
   return m;
 }
 
-function setCookie(res, name, value, opt={}) {
-  const a = [`${name}=${encodeURIComponent(value)}`];
-  if (opt.maxAge) a.push(`Max-Age=${opt.maxAge}`);
-  a.push('Path=/', 'SameSite=Lax', 'HttpOnly', 'Secure');
-  res.setHeader('set-cookie', a.join('; '));
-}
-
+// --- Redis (Upstash REST) ---
 async function redis(cmd, ...args) {
   const body = [[ String(cmd).toLowerCase(), ...args.map(v => String(v)) ]];
   const r = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
@@ -86,48 +102,29 @@ function normEmail(e) { return String(e || '').trim().toLowerCase(); }
 function uid(){ return crypto.randomBytes(16).toString('hex'); }
 function genSalt(){ return crypto.randomBytes(16).toString('hex'); }
 
-// 【新增】生成6位随机数字码
+// OTP
 function genVerifyCode() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-// 【新增】发送验证邮件 (Resend 真实实现)
+// Email
 async function sendVerificationEmail(toEmail, code, subject = '您的验证码') {
-  
-  // 检查 Resend 客户端和发件人邮箱是否已在 Vercel 中配置
-  // 这会检查 process.env.RESEND_API_KEY 和 process.env.EMAIL_FROM
   if (!resend || !EMAIL_FROM) {
-    console.error('RESEND_API_KEY 或 EMAIL_FROM 未在环境变量中配置');
-    
-    // 在开发环境中，我们回退到打印日志，方便测试
     if (process.env.VERCEL_ENV !== 'production') {
-      console.log(`=== 邮件模拟发送 (服务未配置) ===`);
-      console.log(`TO: ${toEmail}`);
-      console.log(`SUBJECT: ${subject}`);
-      console.log(`CODE: ${code}`);
-      console.log(`=================================`);
-      return; // 开发环境假装发送成功
+      console.log(`=== 邮件模拟发送 ===\nTO: ${toEmail}\nSUBJECT: ${subject}\nCODE: ${code}\n====================`);
+      return;
     }
-    
-    // 生产环境中必须报错
     throw new Error('邮件服务未正确配置');
   }
-  
-  try {
-    // 使用 Resend 发送邮件
-    await resend.emails.send({
-      from: EMAIL_FROM, // 从 Vercel 环境变量读取的发件人
-      to: toEmail,
-      subject: subject,
-      html: `<p>您的验证码是：<b>${code}</b></p><p>该验证码10分钟内有效。</p>`,
-    });
-  } catch (error) {
-    console.error('Resend 邮件发送失败:', error);
-    throw new Error('邮件发送失败，请稍后重试');
-  }
+  await resend.emails.send({
+    from: EMAIL_FROM,
+    to: toEmail,
+    subject,
+    html: `<p>您的验证码是：<b>${code}</b></p><p>该验证码10分钟内有效。</p>`,
+  });
 }
 
-
+// Password hashing
 const ITER=210000, KEYLEN=32, DIGEST='sha256';
 function hashPassword(pw, s) {
   const hex = crypto.pbkdf2Sync(String(pw), String(s), ITER, KEYLEN, DIGEST).toString('hex');
@@ -140,6 +137,7 @@ function verifyPassword(pw, stored) {
   return h2 === hex;
 }
 
+// Users & sessions
 async function getUserByEmail(email) {
   const key = `user:email:${normEmail(email)}`;
   const raw = await redis('get', key);
@@ -161,9 +159,13 @@ async function createUser(email, password) {
   return { user };
 }
 
+function randomSid() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 async function createSession(res, uid) {
-  const sid = uid + ':' + crypto.randomBytes(10).toString('hex');
-  await redis('setex', `sess:${sid}`, String(TTL_DAYS * 86400), uid); // 全部字符串
+  const sid = randomSid(); // do not expose uid in SID
+  await redis('setex', `sess:${sid}`, String(TTL_DAYS * 86400), uid);
   setCookie(res, 'sid', sid, { maxAge: TTL_DAYS * 86400 });
   return sid;
 }
@@ -180,15 +182,44 @@ async function destroySession(req, res) {
   setCookie(res, 'sid', '', { maxAge: 0 });
 }
 
+// --- CSRF (double submit cookie) ---
+function ensureCsrfCookie(req, res) {
+  const c = parseCookies(req).csrf;
+  if (c) return c;
+  const token = crypto.randomBytes(16).toString('hex');
+  setCookiePublic(res, 'csrf', token, { maxAge: TTL_DAYS * 86400 });
+  return token;
+}
+function requireCsrf(req) {
+  const header = String(req.headers['x-csrf-token'] || '');
+  const cookie = parseCookies(req).csrf || '';
+  return cookie && header && cookie === header;
+}
+
+// --- Rate limiting ---
+function clientIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '0.0.0.0').split(',')[0].trim();
+}
+async function bumpRate(key, windowSec) {
+  const n = await redis('incr', key);
+  if (n === 1) await redis('expire', key, String(windowSec));
+  return n;
+}
+
 module.exports = {
-  json, readBody, parseCookies, setCookie,
+  // http
+  json, readBody, parseCookies, setCookie, setCookiePublic,
+  // redis
   redis, redisPipeline,
+  // auth & users
   normEmail, uid, genSalt, hashPassword, verifyPassword,
-  getUserByEmail, createUser, createSession, getUserIdBySession,
-  TTL: TTL_DAYS, destroySession,
-  
-  // 【新增】导出的模块
-  genVerifyCode,
-  sendVerificationEmail,
-  VERIFY_CODE_TTL_SECONDS,
+  getUserByEmail, createUser, createSession, getUserIdBySession, destroySession,
+  // constants
+  TTL: TTL_DAYS, VERIFY_CODE_TTL_SECONDS,
+  // email / otp
+  genVerifyCode, sendVerificationEmail,
+  // csrf
+  ensureCsrfCookie, requireCsrf,
+  // rate / ip
+  bumpRate, clientIp
 };

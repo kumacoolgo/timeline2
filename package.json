@@ -1,5 +1,15 @@
 {
+  "name": "timeline2-secure",
+  "version": "1.0.0",
+  "private": true,
+  "description": "费用时间轴",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "resend": "^6.3.0"
+  },
+  "scripts": {
+    "test": "node -e \"console.log('ok')\""
   }
 }
