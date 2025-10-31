@@ -58,6 +58,7 @@
     * `UPSTASH_REDIS_REST_TOKEN`: (来自 Upstash)
     * `RESEND_API_KEY`: (来自 Resend)
     * `EMAIL_FROM`: (来自 Resend, 例如: `noreply@your-verified-domain.com`)
+    * `PUBLIC_ORIGIN`: (Domain)
     * `SESSION_TTL_DAYS`: (可选, 默认值为 7)
 
 4.  点击 "Deploy"。Vercel 会自动识别 `package.json` 并安装 `resend` 依赖，然后部署你的应用。
