@@ -3,8 +3,15 @@ const { Ratelimit } = require('@upstash/ratelimit');
 const { Redis } = require('@upstash/redis');
 const { getIP } = require('./http');
 
-const redis = Redis.fromEnv();
+// 【修改】不再使用 Redis.fromEnv()
+// 我们手动从 process.env 读取变量来创建 Redis 实例
+// 这在 Vercel 环境中更健壮
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
+// 你现有的限流器配置（无需改变）
 const rl = {
   globalIp10m: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '10 m'), prefix: 'rl:g:ip10m' }),
   loginIp10m: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(20, '10 m'), prefix: 'rl:login:ip' }),
@@ -30,7 +37,11 @@ async function apply(limiter, key, res) {
     return true;
   } catch (e) {
     console.error('Rate limit error:', e);
-    // Fail-open on ratelimit error
+    // 捕获 Redis 连接错误
+    // 如果限流器崩溃，我们选择“安全打开”(fail-open)，允许请求通过
+    // 但在 Vercel 日志中打印一个严重错误
+    console.error("FATAL: Ratelimit connection failed. Check UPSTASH env vars.", e.message);
+    // 暂时允许请求通过，以免完全阻塞应用
     return true; 
   }
 }
