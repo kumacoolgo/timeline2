@@ -1,48 +1,39 @@
 // api/password-reset-send-code.js
-const { json, readBody, normEmail, getUserByEmail, genVerifyCode, sendVerificationEmail, redis, VERIFY_CODE_TTL_SECONDS, getIp, rateLimit } = require('./_utils');
+const { withSecurity } = require('./_lib/withSecurity');
+const { limitAuthSendCode } = require('./_lib/ratelimit');
+const { json, normEmail, getUserByEmail, genVerifyCode, sendVerificationEmail, redis, VERIFY_CODE_TTL_SECONDS } = require('./_utils');
 
-module.exports = async (req, res) => {
-  const ip = getIp(req);
-  let email = ''; // 在 try/catch 外部声明
+async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return json(res, { error: 'Method Not Allowed' }, 405);
+  }
+  
+  const email = normEmail(req.body?.email || '');
+  if (!email) {
+    return json(res, { error: '请输入邮箱地址' }, 400);
+  }
+
+  const existingUser = await getUserByEmail(email);
+  if (!existingUser) {
+    // 统一提示，防止枚举
+    return json(res, { error: '如果邮箱已注册，您将收到一封邮件' }, 200);
+  }
+
+  const code = genVerifyCode();
+  const key = `verify:reset:${email}`;
+  await redis('setex', key, VERIFY_CODE_TTL_SECONDS, code);
 
   try {
-    if (req.method !== 'POST') return json(res, { error: 'Method Not Allowed' }, 405);
-    const body = await readBody(req);
-    email = normEmail(body?.email || '');
-
-    // 【新增 A.2】速率限制：
-    // 1. 同一 IP，1小时内最多发送 5 次
-    // 2. 同一 Email，1小时内最多发送 5 次
-    await Promise.all([
-      rateLimit('send_code_ip', ip, 5, 60 * 60),
-      rateLimit('send_code_email', email, 5, 60 * 60)
-    ]);
-    
-    if (!email) {
-      return json(res, { error: '请输入邮箱地址' }, 400);
-    }
-
-    const existingUser = await getUserByEmail(email);
-    if (!existingUser) {
-      return json(res, { error: '该邮箱未注册' }, 400);
-    }
-
-    const code = genVerifyCode();
-    const key = `verify:reset:${email}`;
-    await redis('setex', key, VERIFY_CODE_TTL_SECONDS, code);
-
-    try {
-      await sendVerificationEmail(email, code, '重置密码 - 您的验证码');
-    } catch (e) {
-      return json(res, { error: e.message || '验证码发送失败' }, 500);
-    }
-
-    return json(res, { ok: true, message: '验证码已发送，10分钟内有效' });
-
+    await sendVerificationEmail(email, code, '重置密码 - 您的验证码');
   } catch (e) {
-    if (e.message === 'Too many requests') {
-      return json(res, { error: e.message }, 429);
-    }
-    return json(res, { error: e.message || String(e) }, 500);
+    return json(res, { error: '验证码发送失败，请稍后重试' }, 500);
   }
-};
+
+  return json(res, { ok: true, message: '如果邮箱已注册，您将收到一封邮件' });
+}
+
+module.exports = withSecurity(handler, {
+  csrf: true,
+  allowedOrigins: [process.env.PUBLIC_ORIGIN],
+  rateLimit: limitAuthSendCode // 邮箱+IP 组合限流
+});

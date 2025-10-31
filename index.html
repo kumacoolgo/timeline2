@@ -270,7 +270,9 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"
+        integrity="sha256-nE3O/K/SlEfl9PUQ5Eqj2IALE0XTBbRsfMuHjB/fC/U="
+        crossorigin="anonymous"></script>
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
@@ -351,7 +353,14 @@ function fillForm(it){
   syncTypeUI(); 
 }
 
-function resolvePlanPrice(ph,idx){ if(!ph?.length) return null; let a=null; ph.sort((x,y)=>x.fromMonth-y.fromMonth).forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); return a } 
+// 【修改】性能优化：移除循环内的排序
+function resolvePlanPrice(sortedPhases,idx){ 
+  if(!sortedPhases?.length) return null; 
+  let a=null; 
+  // 假设 ph (sortedPhases) 已经排好序
+  sortedPhases.forEach(p=>{ if(idx>=p.fromMonth) a=p.amount }); 
+  return a;
+} 
 function isInCancel(w,idx){ return w?.some?.(x=> idx>=x.fromMonth && idx<=x.toMonth) }
 function visibleItems(){ return activeId? items.filter(i=>i.id===activeId) : (items.length?[items[0]]:[]) }
 
@@ -386,14 +395,17 @@ function render(){
     activeId = items[0]?.id || null;
   }
   
-  // --- 2. 渲染左侧列表 ---
+  // --- 2. 渲染左侧列表 (【修改】修复 XSS 漏洞) ---
   const L=$('#leftWrap');
   if(sortableList) {
     sortableList.destroy();
     sortableList = null;
   }
   
-  L.innerHTML = items.map(it => { 
+  // 【修改】使用 DocumentFragment 和 textContent 避免 XSS
+  const frag = document.createDocumentFragment();
+  items.forEach(it => {
+    // typeLabel 和 subDetail 是内部逻辑生成的安全 HTML
     const typeLabel = it.type === 'plan' ? '<span class="small" style="color:#6b5cff">套餐</span>' :
                     it.type === 'insurance' ? '<span class="small" style="color:#10b981">保险</span>' :
                     '<span class="small" style="color:#3b82f6">保修</span>';
@@ -412,24 +424,60 @@ function render(){
       if (termStr) subDetail = `<span class="small" style="color:#10b981">保期 ${termStr}</span>`;
     }
 
-    return `<div class="item ${it.id===activeId?'active':''}" data-id="${it.id}">
-      <div>
-        <div class="title item-line-1">
-          <span>${it.name}</span>
-          ${typeLabel}
-          <span class="meta item-number">#${it.number||'-'}</span>
-        </div>
-        <div class="meta item-line-2">
-          <span>开始: ${it.startDate||'-'}</span>
-        </div>
-        <div class="meta item-line-3">
-          ${subDetail} </div>
-      </div>
-      <div class="ops">
-        <button class="ghost btnEdit" data-id="${it.id}" type="button">编辑</button>
-      </div>
-    </div>`;
-  }).join(''); 
+    const itemDiv = document.createElement('div');
+    itemDiv.className = `item ${it.id === activeId ? 'active' : ''}`;
+    itemDiv.dataset.id = it.id;
+
+    // --- 安全内容构建 ---
+    const contentDiv = document.createElement('div');
+    
+    const line1 = document.createElement('div');
+    line1.className = 'title item-line-1';
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = it.name || ''; // 关键：使用 textContent
+    line1.appendChild(nameSpan);
+    
+    line1.innerHTML += typeLabel; // typeLabel 是内部硬编码的
+    
+    const numberSpan = document.createElement('span');
+    numberSpan.className = 'meta item-number';
+    numberSpan.textContent = `#${it.number || '-'}`; // 关键：使用 textContent
+    line1.appendChild(numberSpan);
+    
+    const line2 = document.createElement('div');
+    line2.className = 'meta item-line-2';
+    
+    const startSpan = document.createElement('span');
+    startSpan.textContent = `开始: ${it.startDate || '-'}`; // 关键：使用 textContent
+    line2.appendChild(startSpan);
+    
+    const line3 = document.createElement('div');
+    line3.className = 'meta item-line-3';
+    line3.innerHTML = subDetail; // subDetail 是内部硬编码的
+    
+    contentDiv.appendChild(line1);
+    contentDiv.appendChild(line2);
+    contentDiv.appendChild(line3);
+    
+    // --- 操作按钮 ---
+    const opsDiv = document.createElement('div');
+    opsDiv.className = 'ops';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'ghost btnEdit';
+    editBtn.type = 'button';
+    editBtn.dataset.id = it.id;
+    editBtn.textContent = '编辑';
+    opsDiv.appendChild(editBtn);
+    
+    itemDiv.appendChild(contentDiv);
+    itemDiv.appendChild(opsDiv);
+    frag.appendChild(itemDiv);
+  });
+  
+  L.innerHTML = ''; // 清空旧内容
+  L.appendChild(frag); // 插入安全的新内容
+  // --- XSS 修复结束 ---
   
   L.querySelectorAll('.item').forEach(div=>{ const id=div.dataset.id; div.onclick=e=>{ if(e.target.closest('button')) return; activeId=id; render(); }; }); 
   
@@ -438,7 +486,7 @@ function render(){
     const it=allCloudItems.find(x=>x.id===b.dataset.id); 
     editingId=it.id; 
     fillForm(it); 
-    showDialogMsg('', false); // 【修改】清空错误
+    showDialogMsg('', false);
     $('#dlgTitle').textContent='编辑项目'; 
     $('#btnDeleteInDialog').style.display = 'inline-block';
     $('#dlg').style.display='flex';
@@ -455,16 +503,18 @@ function render(){
   
   const it = data[0]; 
   
-  // --- 【修改】使用新的日期解析函数 ---
   const minStart = startOfMonth(parseISODate(it.startDate || null));
   const today = new Date();
   const todayPlusOneYear = addMonths(today, 12);
   let maxEndCandidate = MaxDate(todayPlusOneYear, minStart);
   const itemStartDate = parseISODate(it.startDate);
   
+  // 【修改】性能优化：在循环外一次性排序
+  const sortedPricePhases = (it.pricePhases || []).filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
+  
   if (it.type === 'plan' || it.type === 'insurance') {
-    if (it.pricePhases && it.pricePhases.length > 0) {
-      const lastPhase = it.pricePhases.sort((a,b) => b.fromMonth - a.fromMonth)[0];
+    if (sortedPricePhases.length > 0) {
+      const lastPhase = sortedPricePhases[sortedPricePhases.length - 1];
       const lastPhaseMonth = (lastPhase.fromMonth || 1) - 1;
       const lastPhaseDate = addMonths(itemStartDate, lastPhaseMonth);
       maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastPhaseDate, 12));
@@ -505,27 +555,24 @@ function render(){
   const todayM = today.getMonth();
   const todayD = today.getDate();
 
+  // 【修改】性能优化：移除“日级子网格”
   head.innerHTML=mlist.map(m=>{
     const q=Math.ceil((m.getMonth()+1)/3); 
     const ym = `${m.getFullYear()}-${pad2(m.getMonth() + 1)}`;
     const mYear = m.getFullYear();
     const mMonth = m.getMonth();
     const isTodayMonth = mYear === todayY && mMonth === todayM;
-    const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-    const totalCols = daysInMonth + 2; 
-    const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
-
-    return `<div class="cell nowrap ${isTodayMonth ? 'today-month' : ''}" data-ym="${ym}" style="text-align:center; ${gridStyle}">
-      <div style="grid-column: 1 / -1; z-index: 5;">
+    
+    // 移除 gridStyle 和 totalCols
+    return `<div class="cell nowrap ${isTodayMonth ? 'today-month' : ''}" data-ym="${ym}" style="text-align:center;">
+      <div>
         <div><b>${m.getFullYear()}-${pad2(m.getMonth()+1)}</b></div>
         <div class=small>Q${q}</div>
       </div>
-      ${''}
     </div>`;
   }).join(''); 
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
-  // --- 【修改】使用新的日期解析函数 ---
   const m0=startOfMonth(parseISODate(it.startDate)); 
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
   
@@ -536,10 +583,9 @@ function render(){
     const mYear = m.getFullYear();
     const mMonth = m.getMonth();
     const isTodayMonth = mYear === todayY && mMonth === todayM;
-    const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-    const totalCols = daysInMonth + 2; 
-    const gridStyle = `display: grid; grid-template-columns: repeat(${totalCols}, 1fr); align-items: center;`;
-    const contentDivStart = `<div style="grid-column: 1 / -1; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
+    
+    // 【修改】性能优化：移除“日级子网格”
+    const contentDivStart = `<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;">`;
     const contentDivEnd = `</div>`;
 
     if(it.type==='warranty'){ 
@@ -551,33 +597,32 @@ function render(){
         warrantyBadge = '<span class="badge cancel">保修外</span>';
       }
 
-      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
+      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center;">
         ${contentDivStart}
           ${warrantyBadge} 
         ${contentDivEnd}
-        ${''}
       </div>`); 
     }else{ 
-      const amount=resolvePlanPrice(it.pricePhases,idx); 
+      // 【修改】传入已排序的数组
+      const amount=resolvePlanPrice(sortedPricePhases,idx); 
       const cancel=isInCancel(it.cancelWindows,idx); 
       let amountBadgeClass = '';
       if (amount != null) {
-        const sortedPhases = (it.pricePhases || []).filter(p => p.amount != null).sort((a,b)=>a.fromMonth-b.fromMonth);
+        // 【修改】复用已排序的数组
         let segmentIndex = 0;
-        for (let j = 0; j < sortedPhases.length; j++) {
-          if (idx >= sortedPhases[j].fromMonth) {
+        for (let j = 0; j < sortedPricePhases.length; j++) {
+          if (idx >= sortedPricePhases[j].fromMonth) {
             segmentIndex = j;
           }
         }
         amountBadgeClass = (segmentIndex % 2 === 0) ? 'amount-segment-1' : 'amount-segment-2';
       }
       
-      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
+      cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center;">
         ${contentDivStart}
           ${amount!=null?`<div class="badge ${amountBadgeClass}">￥ ${amount.toLocaleString()}</div>`:''}
           ${cancel?'<div class="badge cancel">退会期</div>':''}
         ${contentDivEnd}
-        ${''}
       </div>`); 
     } 
   } 
@@ -589,7 +634,7 @@ function render(){
     delay: 500,
     delayOnTouchOnly: true,
     onEnd: async (evt) => { 
-      // ... (排序逻辑未修改, 已包含 show/hide loader)
+      // (排序逻辑未修改)
       const movedItem = items[evt.oldIndex]; 
       const masterIndex = allCloudItems.findIndex(it => it.id === movedItem.id);
       const [masterMovedItem] = allCloudItems.splice(masterIndex, 1);
@@ -608,13 +653,13 @@ function render(){
           }));
         }
       });
-      showLoader(); // 【修改】
+      showLoader();
       try {
         if(updates.length > 0) await Promise.all(updates);
       } catch (e) {
-        alert('保存排序失败: ' + e.message); // 排序失败用 alert，因为它不依赖弹窗
+        alert('保存排序失败: ' + e.message); 
       } finally {
-        await loadCloudItems(); // loadCloudItems 会 hideLoader
+        await loadCloudItems(); 
       }
     }
   });
@@ -628,7 +673,7 @@ $('#f_type').onchange=syncTypeUI;
 $('#btnAdd').onclick=()=>{ 
   editingId=null; 
   fillForm(null); 
-  showDialogMsg('', false); // 【修改】清空错误
+  showDialogMsg('', false);
   $('#dlgTitle').textContent='新增项目'; 
   $('#btnDeleteInDialog').style.display = 'none';
   $('#dlg').style.display='flex'; 
@@ -638,11 +683,10 @@ $('#btnClose').onclick=()=>$('#dlg').style.display='none';
 $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; 
 $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
 
-// --- 【修改】重写保存逻辑，集成 Loader 和 内部错误提示 ---
 $('#btnSave').onclick= async ()=>{ 
-  showDialogMsg('', false); // 清空消息
+  showDialogMsg('', false);
   const it = readForm(); 
-  if(!it) return; // readForm 会显示错误
+  if(!it) return;
   
   $('#btnSave').disabled = true;
   showLoader();
@@ -662,16 +706,15 @@ $('#btnSave').onclick= async ()=>{
       });
     }
     $('#dlg').style.display='none';
-    await loadCloudItems(); // loadCloudItems 会 hideLoader
+    await loadCloudItems();
   } catch (e) {
-    showDialogMsg(e.message || '保存失败'); // 在弹窗内显示错误
-    hideLoader(); // 出错时手动隐藏
+    showDialogMsg(e.message || '保存失败');
+    hideLoader();
   } finally {
     $('#btnSave').disabled = false;
   }
 };
 
-// --- 【修改】重写删除逻辑，集成 Loader 和 内部错误提示 ---
 $('#btnDeleteInDialog').onclick = async () => {
   if (!editingId) return; 
   if (!confirm('确定要删除该项目吗？此操作无法撤销。')) return;
@@ -682,11 +725,11 @@ $('#btnDeleteInDialog').onclick = async () => {
   showLoader();
   try {
     await api('/api/items?id=' + editingId, { method: 'DELETE' });
-    $('#dlg').style.display='none'; // 仅成功时关闭
-    await loadCloudItems(); // loadCloudItems 会 hideLoader
+    $('#dlg').style.display='none';
+    await loadCloudItems();
   } catch (e) {
-    showDialogMsg(e.message || '删除失败'); // 在弹窗内显示错误
-    hideLoader(); // 出错时手动隐藏
+    showDialogMsg(e.message || '删除失败');
+    hideLoader();
   } finally {
     b.disabled = false;
   }
@@ -703,20 +746,62 @@ $('#btnClearSearch').onclick = () => {
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
-// 认证 API (未修改, 逻辑OK)
+// --- 【修改】API 封装，自动注入 CSRF 并统一处理错误 ---
+
+// 读取 Cookie 的小工具
+function getCookie(name){
+  // (?:^|; ) 匹配非捕获组的开头或分号+空格
+  // [.$?*|{}()\\[\\]/+^] 匹配所有需要转义的正则特殊字符
+  // ([^;]*) 捕获所有不是分号的字符 (cookie 的值)
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]/+^])/g, '\\$1') + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function csrfToken(){ 
+  // 假设后端设置的 CSRF cookie 名为 __Host-csrf
+  return getCookie('__Host-csrf'); 
+}
+
 async function api(path, init){
-  const r = await fetch(path, { credentials:'include', ...init });
+  const method = (init?.method || 'GET').toUpperCase();
+  const isWrite = ['POST','PUT','PATCH','DELETE'].includes(method);
+  const headers = Object.assign({}, init?.headers || {});
+  
+  // 保护型请求头，可帮助某些 WAF/后端判别 XHR
+  headers['X-Requested-With'] = 'XMLHttpRequest';
+  if (isWrite) {
+    headers['X-CSRF-Token'] = csrfToken(); // 关键：自动注入 CSRF
+  }
+  
+  const r = await fetch(path, { credentials:'include', ...init, headers });
   const text = await r.text();
-  let data; try{ data = JSON.parse(text||'{}') }catch{ data = { error:text||'网络错误' } }
+  let data; try{ data = JSON.parse(text||'{}'); }catch{ data = { error:text||'网络错误' } }
+  
   if(!r.ok){
-    const isAuthPath = ['/api/login', '/api/register', '/api/register-send-code', '/api/password-reset-send-code', '/api/password-reset-confirm'].includes(path);
+    const isAuthPath = ['/api/login', '/api/register', '/api/register-send-code', '/api/password-reset-send-code', '/api/password-reset-confirm', '/api/csrf'].includes(path);
+
+    // 【修改】统一处理错误，防止用户枚举
+    if ((r.status === 400) && isAuthPath) {
+      // 捕获 "邮箱或密码错误", "验证码错误" 等
+      throw new Error(data.error || '操作失败，请检查输入');
+    }
+    if (r.status === 429) {
+      throw new Error(data.error || '请求过于频繁，请稍后再试');
+    }
+    if (r.status === 403) {
+      // 捕获 CSRF / Origin 错误
+      throw new Error(data.error || '安全验证失败，请刷新页面');
+    }
+    
+    // 处理 401 未授权
     if (r.status === 401 && !isAuthPath) {
       ONLINE = false;
       $('#btnUser').textContent = '登录/注册';
       $('#btnLogout').style.display = 'none';
       DlgAuth.show('login'); 
-      hideLoader(); // 【修改】如果401了，隐藏加载动画
+      hideLoader();
     }
+    
+    // 其他错误
     const msg = data.reason ? `${data.error} (${data.reason})` : (data.error || `HTTP ${r.status}`);
     throw new Error(msg);
   }
@@ -780,7 +865,6 @@ $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
 $('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
 $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
 
-// --- 【修改】登出逻辑，添加 Loader ---
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
   showLoader();
@@ -789,12 +873,13 @@ $('#btnLogout').onclick = async () => {
     location.reload(); 
   } 
   catch (e) { 
-    alert('登出失败: ' + e.message); // 登出失败用 alert
+    // 【修改】使用 DlgAuth 显示错误，如果 DlgAuth 可见 (虽然此时不可见)
+    // 登出失败影响较小，用 alert 也可以
+    alert('登出失败: ' + e.message);
     hideLoader();
   }
 };
 
-// --- 【修改】发送注册码，使用 /api/register-send-code ---
 $('#btnSendRegCode').onclick = async () => {
   const btn = $('#btnSendRegCode');
   const email = $('#reg_em').value.trim();
@@ -805,12 +890,12 @@ $('#btnSendRegCode').onclick = async () => {
     DlgAuth.showMsg('register', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn); 
   } catch (e) {
+    // e.message 已经被 api() 统一处理
     DlgAuth.showMsg('register', e.message || '发送失败');
     btn.disabled = false; 
   }
 };
 
-// --- 【修改】注册，使用 /api/register ---
 $('#goReg').onclick = async () => {
   const b = $('#goReg'); b.disabled = true; DlgAuth.showMsg('register', '');
   try {
@@ -820,11 +905,11 @@ $('#goReg').onclick = async () => {
     await api('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password, code }) });
     DlgAuth.showMsg('register', '注册成功，请返回登录', false);
   } catch (e) {
+    // e.message 已经被 api() 统一处理
     DlgAuth.showMsg('register', e.message || '注册失败');
   } finally { b.disabled = false; }
 };
 
-// --- 【修改】登录逻辑，集成 Loader ---
 $('#goLogin').onclick = async () => {
   const b = $('#goLogin'); b.disabled = true; DlgAuth.showMsg('login', '');
   showLoader();
@@ -837,12 +922,12 @@ $('#goLogin').onclick = async () => {
     DlgAuth.hide();
     await loadCloudItems(); // loadCloudItems 会 hideLoader
   } catch (e) {
+    // e.message 已经被 api() 统一处理 (例如 "邮箱或密码错误")
     DlgAuth.showMsg('login', e.message || '登录失败');
     hideLoader();
   } finally { b.disabled = false; }
 };
 
-// 密码重置 (未修改)
 $('#btnSendResetCode').onclick = async () => {
   const btn = $('#btnSendResetCode');
   const email = $('#reset_em').value.trim();
@@ -850,9 +935,11 @@ $('#btnSendResetCode').onclick = async () => {
   btn.disabled = true; DlgAuth.showMsg('reset', '发送中...', false);
   try {
     const data = await api('/api/password-reset-send-code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email }) });
+    // 后端返回了 "如果邮箱已注册..."
     DlgAuth.showMsg('reset', data.message || '验证码已发送', false);
     DlgAuth.startCountdown(btn);
   } catch (e) {
+    // e.message 已经被 api() 统一处理
     DlgAuth.showMsg('reset', e.message || '发送失败');
     btn.disabled = false;
   }
@@ -867,11 +954,11 @@ $('#goReset').onclick = async () => {
     await api('/api/password-reset-confirm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, code, newPassword }) });
     DlgAuth.showMsg('reset', '密码重置成功，请返回登录', false);
   } catch (e) {
+    // e.message 已经被 api() 统一处理
     DlgAuth.showMsg('reset', e.message || '重置失败');
   } finally { b.disabled = false; }
 };
 
-// --- 【修改】加载数据，集成 Loader ---
 async function loadCloudItems() {
   showLoader();
   try {
@@ -889,7 +976,6 @@ async function loadCloudItems() {
   }
 }
 
-// --- 【修改】检查登录，集成 Loader ---
 async function checkLogin() {
   showLoader();
   try {
@@ -906,8 +992,24 @@ async function checkLogin() {
   }
 }
 
-function bootstrap(){ 
-  checkLogin(); 
+// --- 【修改】启动逻辑，增加 CSRF 初始化 ---
+
+// 【新增】启动时确保拿到 CSRF Cookie
+async function ensureCsrf() {
+  if (!getCookie('__Host-csrf')) { // 必须匹配后端 cookie 名
+    try {
+      // 如果不存在，调用 /api/csrf 来设置它
+      await fetch('/api/csrf', { method: 'GET', credentials: 'include' });
+    } catch (e) {
+      console.error('Failed to ensure CSRF token:', e);
+      // 即使失败也继续，后续的写操作会失败，但读操作(checkLogin)应继续
+    }
+  }
+}
+
+async function bootstrap(){ 
+  await ensureCsrf(); // 【修改】先获取 CSRF
+  checkLogin();       // 再检查登录状态
 }
 bootstrap();
 
