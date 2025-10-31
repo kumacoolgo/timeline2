@@ -116,8 +116,7 @@ async function createUser(email, password) {
   const user = { uid: uid(), email, salt, hash, createdAt: Date.now() };
   await redisPipeline([
     ['set', key, JSON.stringify(user)],
-    ['set', `user:uid:${user.uid}`, email],
-    ['sadd', 'users:all', user.uid] // 记录所有用户，便于 Cron 扫描
+    ['set', `user:uid:${user.uid}`, email]
   ]);
   return { user };
 }

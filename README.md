@@ -5,7 +5,7 @@
 ## ✨ 新增/优化
 - **安全**：CSRF Cookie 在本地与生产自适应；统一 JSON 错误响应；严格 CSP/HSTS/安全头；默认关闭 `/api/debug`（`ENABLE_DEBUG_API=1` 才可用）。
 - **前端**：移除内联脚本 → `app.js`；HTML5 DnD 实现列表排序；新增 **导入/导出**、**统计视图**；支持 **分类/标签/货币**；金额按货币自动格式化。
-- **后端**：导入(`/api/import`) / 导出(`/api/export`)；每日提醒 **Cron**（`/api/cron-daily`，Bearer 鉴权）；注册时记录 `users:all` 以便 Cron 扫描。
+- **后端**：导入(`/api/import`) / 导出(`/api/export`)。
 - **API 严格性**：写操作启用 CSRF + Origin 白名单；Items 入参校验；限流在 429 时带 JSON 头。
 
 ## 🛠 技术栈
@@ -18,18 +18,12 @@
 1. Fork/Clone 项目到 Git。
 2. Vercel 新建 Project → 选择此仓库。
 3. 配置环境变量（所有都为 **Plaintext**）：
-   - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
-   - `RESEND_API_KEY` / `EMAIL_FROM`（可空，本地会“模拟发送”）
-   - `PUBLIC_ORIGIN`（你的外网域名 origin，例如 `https://xxx.vercel.app`）
-   - `SESSION_TTL_DAYS`（可选，默认 `7`）
-   - （可选）`ENABLE_DEBUG_API=1`（仅测试环境使用）
-   - （可选）`CRON_SECRET`（用于 `/api/cron-daily` 的 Bearer 鉴权）
-   - （可选）`REMIND_DAYS_AHEAD`（默认 `3`）
+   - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
+   - `RESEND_API_KEY` / `EMAIL_FROM`（可空，本地会“模拟发送”，用于注册/重置密码）
+   - `PUBLIC_ORIGIN`（你的外网域名 origin，例如 `https://xxx.vercel.app`）
+   - `SESSION_TTL_DAYS`（可选，默认 `7`）
+   - （可选）`ENABLE_DEBUG_API=1`（仅测试环境使用）
 4. 点击 Deploy。
-
-> **Cron 提醒**：本仓库 `vercel.json` 已包含一个 09:00(UTC) 的计划任务。  
-> 在 Vercel 的 Project → Settings → Cron Jobs 中确认已生效，并在 Cron Job 的 “Headers” 里配置：  
-> `Authorization: Bearer <你的 CRON_SECRET>`。
 
 ## 🧭 使用
 - 登录/注册后，添加「套餐 / 保修 / 保险」项目，支持：阶段单价、退会期、保修期、保期。
