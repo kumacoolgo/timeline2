@@ -270,9 +270,7 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"
-        integrity="sha256-nE3O/K/SlEfl9PUQ5Eqj2IALE0XTBbRsfMuHjB/fC/U="
-        crossorigin="anonymous"></script>
+<script src="https://fastly.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
@@ -753,7 +751,10 @@ function getCookie(name){
   // (?:^|; ) 匹配非捕获组的开头或分号+空格
   // [.$?*|{}()\\[\\]/+^] 匹配所有需要转义的正则特殊字符
   // ([^;]*) 捕获所有不是分号的字符 (cookie 的值)
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]/+^])/g, '\\$1') + '=([^;]*)'));
+  //const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]/+^])/g, '\\$1') + '=([^;]*)'));
+  const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '=([^;]*)')
+);
+
   return m ? decodeURIComponent(m[1]) : '';
 }
 function csrfToken(){ 
