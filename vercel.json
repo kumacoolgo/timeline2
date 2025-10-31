@@ -1,12 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x",
-      "memory": 128,
-      "maxDuration": 10
-    }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
@@ -28,9 +21,6 @@
     }
   ],
   "crons": [
-    {
-      "path": "/api/cron-daily",
-      "schedule": "0 9 * * *"
-    }
+    { "path": "/api/cron-daily", "schedule": "0 9 * * *" }
   ]
 }
