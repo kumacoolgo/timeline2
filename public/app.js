@@ -413,9 +413,29 @@ $('#btnDeleteInDialog').onclick = async ()=>{
 };
 
 $('#btnToday').onclick = ()=> scrollToToday('smooth');
-$('#btnSearch').onclick = ()=> render();
-$('#btnClearSearch').onclick = ()=> { $('#filter').value=''; render(); };
-$('#filter').onkeyup = e => { if(e.key==='Enter') render(); };
+$('#btnClearSearch').onclick = ()=> {
+  $('#filter').value='';
+  render();
+  $('#filter').focus();
+};
+
+// === 自动搜索（防抖 & 兼容中文输入法）===
+const SEARCH_DEBOUNCE_MS = 200;
+let searchTimer = null;
+let isComposing = false; // 输入法合成中
+
+$('#filter').addEventListener('compositionstart', ()=>{ isComposing = true; });
+$('#filter').addEventListener('compositionend', ()=>{
+  isComposing = false;
+  // 合成结束再执行一次
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(render, SEARCH_DEBOUNCE_MS);
+});
+$('#filter').addEventListener('input', ()=>{
+  if (isComposing) return; // 合成过程中不触发
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(render, SEARCH_DEBOUNCE_MS);
+});
 
 // 导出/导入/统计
 $('#btnExport').onclick = async ()=>{
