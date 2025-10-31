@@ -1,7 +1,16 @@
 // api/password-reset-confirm.js
-const { json, readBody, normEmail, getUserByEmail, genSalt, hashPassword, redis, redisPipeline } = require('./_utils');
+const { json, readBody, normEmail, getUserByEmail, genSalt, hashPassword, redis, redisPipeline, getIp, rateLimit } = require('./_utils');
 
 module.exports = async (req, res) => {
+  const ip = getIp(req);
+
+  try {
+    // 【新增 A.2】速率限制：15分钟内，同一IP最多尝试 5 次
+    await rateLimit('reset_confirm', ip, 5, 60 * 15);
+  } catch (e) {
+    return json(res, { error: e.message }, 429);
+  }
+
   try {
     if (req.method !== 'POST') return json(res, { error: 'Method Not Allowed' }, 405);
     
@@ -14,11 +23,11 @@ module.exports = async (req, res) => {
       return json(res, { error: '缺少参数' }, 400);
     }
     
-    if (newPassword.length < 8) {
-      return json(res, { error: '新密码必须≥8位' }, 400);
+    // 【修改 C.2】加强密码策略
+    if (newPassword.length < 10) {
+      return json(res, { error: '新密码必须≥10位' }, 400);
     }
 
-    // 1. 验证验证码
     const key = `verify:reset:${email}`;
     const storedCode = await redis('get', key);
 
@@ -30,26 +39,21 @@ module.exports = async (req, res) => {
       return json(res, { error: '验证码错误' }, 400);
     }
     
-    // 2. 验证用户
     const user = await getUserByEmail(email);
     if (!user) {
       return json(res, { error: '用户不存在' }, 404);
     }
     
-    // 3. 更新密码
     const salt = genSalt();
     const hash = hashPassword(newPassword, salt);
     
-    // 更新 user 对象
     user.salt = salt;
     user.hash = hash;
     
     const userKey = `user:email:${email}`;
     
     await redisPipeline([
-      // 更新用户信息
       ['set', userKey, JSON.stringify(user)],
-      // 删除已用的验证码
       ['del', key]
     ]);
 

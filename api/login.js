@@ -1,6 +1,16 @@
-const { json, readBody, normEmail, getUserByEmail, verifyPassword, createSession } = require('./_utils');
+// api/login.js
+const { json, readBody, normEmail, getUserByEmail, verifyPassword, createSession, getIp, rateLimit } = require('./_utils');
 
 module.exports = async (req, res) => {
+  const ip = getIp(req);
+  
+  try {
+    // 【新增 A.2】速率限制：10分钟内，同一IP最多尝试 10 次
+    await rateLimit('login', ip, 10, 60 * 10);
+  } catch (e) {
+    return json(res, { error: e.message }, 429); // 429 Too Many Requests
+  }
+
   try {
     if (req.method !== 'POST') return json(res, { error: 'Method Not Allowed' }, 405);
     const body = await readBody(req);
