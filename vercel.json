@@ -1,8 +1,8 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "headers": [
@@ -19,9 +19,6 @@
     }
   ],
   "crons": [
-    {
-      "path": "/api/cron-daily",
-      "schedule": "0 9 * * *"
-    }
+    { "path": "/api/cron-daily", "schedule": "0 9 * * *" }
   ]
 }
