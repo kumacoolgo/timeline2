@@ -1,5 +1,16 @@
 {
+  "name": "expense-timeline-app",
+  "version": "1.0.0",
+  "description": "A timeline-based expense and subscription tracker.",
+  "private": true,
+  "scripts": {
+    "start": "echo 'This is a Vercel serverless project. Deploy with vercel.'",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
     "resend": "^6.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

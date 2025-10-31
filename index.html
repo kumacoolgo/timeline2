@@ -7,7 +7,7 @@
 <style>
 :root{--brand:#3b82f6;--muted:#667085;--card:#ffffff;--line:#eef0f3;--pill:#f1f5ff;--row-h:72px;--col-w:110px;--radius:14px}
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:#f6f8fb;color:#0f172a;font:14px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial}
+html,body{margin:0;padding:0;background:#f6f8fb;color:#0f172a;font:15px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial}
 button{border:0;border-radius:10px;background:#111827;color:#fff;padding:8px 12px;cursor:pointer}
 button.ghost{background:#eceff3;color:#111827} button.primary{background:var(--brand)}
 input,select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;outline:none}
@@ -84,8 +84,8 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
 
 .icon-btn {
     display: flex; justify-content: center; align-items: center;
-    width: 30px; height: 30px; border: none; border-radius: 50%; 
-    font-size: 1.1rem; font-weight: bold; line-height: 1;
+    width: 34px; height: 34px; border: none; border-radius: 50%; 
+    font-size: 1.2rem; font-weight: bold; line-height: 1;
     cursor: pointer; flex-shrink: 0; transition: background-color 0.2s;
 }
 .delete-btn { background-color: #fff0f0; color: #d93025; border: 1px solid #f5c6cb; }
@@ -107,9 +107,17 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
   background: none; border: none; color: var(--brand);
   cursor: pointer; padding: 0; font-size: 12px; text-align: left;
 }
+
+/* --- 【新增】Loader 样式 --- */
+.loader-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.6);z-index:10000}
+.loader-spin{width:40px;height:40px;border:4px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
+
+<div id="loader" class="loader-wrap" style="display:none"><div class="loader-spin"></div></div>
+
 <div class="wrap">
   <div class="header card">
     <div class="row" style="justify-content: space-between;">
@@ -191,6 +199,8 @@ fieldset legend{font-size:12px;color:var(--muted)} .row-fields{display:flex;gap:
     </div>
     <div id="blockWarranty" style="display:none;margin-top:8px"><label class="small">保修期（月）</label><input id="f_wm" type="number" min="0" value="24" style="width:120px"/></div>
     
+    <div id="dlg_msg" class="small" style="color:#ef4444; margin-top: 10px; text-align: right;"></div>
+    
     <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px">
       <button id="btnDeleteInDialog" class="ghost" type="button" style="color: #d93025; background: #fff0f0; border-color: #f5c6cb; display: none;">删除</button>
       <div>
@@ -270,7 +280,26 @@ let items = [];
 let activeId=null, editingId=null, ONLINE=false;
 let sortableList = null;
 
+// --- 【新增】Loader 引用和辅助函数 ---
+const $loader = $('#loader');
+function showLoader() { $loader.style.display = 'flex'; }
+function hideLoader() { $loader.style.display = 'none'; }
+
+// --- 【新增】主弹窗错误提示 ---
+const $dlgMsg = $('#dlg_msg');
+function showDialogMsg(message, isError = true) {
+  $dlgMsg.textContent = message;
+  $dlgMsg.style.color = isError ? '#ef4444' : '#16a34a';
+}
+
 function pad2(n){return (n<10?'0':'')+n;} 
+// --- 【修改】统一的日期解析函数，避免时区问题 ---
+function parseISODate(s) { // s = 'YYYY-MM-DD'
+  if (!s) return new Date(); // Fallback
+  const parts = s.split('-').map(Number);
+  // 使用 年, 月-1, 日 构造函数，强制使用本地时区解析
+  return new Date(parts[0], parts[1] - 1, parts[2]); 
+}
 function startOfMonth(d){return new Date(d.getFullYear(), d.getMonth(), 1)} 
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1) }
 function MaxDate(d1, d2) { return d1 > d2 ? d1 : d2; }
@@ -287,8 +316,10 @@ function addCancel(i){const d=document.createElement('div');d.className='row-fie
 $('#btnAddPhase').onclick=()=>addPhase(); $('#btnAddCancel').onclick=()=>addCancel();
 
 function readForm(){ 
+  showDialogMsg('', false); // 清空错误
   const type=$('#f_type').value.trim(), name=$('#f_name').value.trim(), start=$('#f_start').value; 
-  if(!name){alert('请填写项目名称');return null} if(!start){alert('请选择开始日期');return null} 
+  if(!name){ showDialogMsg('请填写项目名称');return null} 
+  if(!start){ showDialogMsg('请选择开始日期');return null} 
   const base={type,name,number:$('#f_number').value.trim(),startDate:start}; 
   if(type==='warranty'){
     return { id:editingId||undefined, ...base, warrantyMonths:Number($('#f_wm').value)||0 }
@@ -335,7 +366,7 @@ function scrollToToday(behavior = 'smooth') {
     const targetScroll = todayCellHead.offsetLeft - gridContainer.offsetLeft - 10;
     gridContainer.scrollTo({ left: Math.max(0, targetScroll), behavior: behavior });
   } else {
-    console.warn('Today is not in the rendered range.');
+    // console.warn('Today is not in the rendered range.');
   }
 }
 
@@ -407,8 +438,9 @@ function render(){
     const it=allCloudItems.find(x=>x.id===b.dataset.id); 
     editingId=it.id; 
     fillForm(it); 
+    showDialogMsg('', false); // 【修改】清空错误
     $('#dlgTitle').textContent='编辑项目'; 
-    $('#btnDeleteInDialog').style.display = 'inline-block'; // <-- 【新增】显示删除按钮
+    $('#btnDeleteInDialog').style.display = 'inline-block';
     $('#dlg').style.display='flex';
   }); 
   
@@ -423,12 +455,12 @@ function render(){
   
   const it = data[0]; 
   
-  // --- 【修改】自动计算时间轴起止点 ---
-  const minStart = startOfMonth(new Date(it.startDate || new Date()));
+  // --- 【修改】使用新的日期解析函数 ---
+  const minStart = startOfMonth(parseISODate(it.startDate || null));
   const today = new Date();
   const todayPlusOneYear = addMonths(today, 12);
   let maxEndCandidate = MaxDate(todayPlusOneYear, minStart);
-  const itemStartDate = new Date(it.startDate);
+  const itemStartDate = parseISODate(it.startDate);
   
   if (it.type === 'plan' || it.type === 'insurance') {
     if (it.pricePhases && it.pricePhases.length > 0) {
@@ -459,7 +491,6 @@ function render(){
   }
   
   let maxEnd = startOfMonth(maxEndCandidate);
-  // --- 自动计算结束 ---
   
   const mlist=[];
   let currentMonth = new Date(minStart);
@@ -494,7 +525,8 @@ function render(){
   }).join(''); 
   
   grid.style.gridTemplateColumns=`repeat(${mlist.length}, ${COL_W}px)`; 
-  const m0=startOfMonth(new Date(it.startDate)); 
+  // --- 【修改】使用新的日期解析函数 ---
+  const m0=startOfMonth(parseISODate(it.startDate)); 
   const MonthIndex=d=>(d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1; 
   
   const cells=[]; 
@@ -519,7 +551,6 @@ function render(){
         warrantyBadge = '<span class="badge cancel">保修外</span>';
       }
 
-      // 【修改】添加 'today-month' class, 移除 todayLine
       cells.push(`<div class="cell ${isTodayMonth ? 'today-month' : ''}" style="text-align:center; ${gridStyle}">
         ${contentDivStart}
           ${warrantyBadge} 
@@ -558,6 +589,7 @@ function render(){
     delay: 500,
     delayOnTouchOnly: true,
     onEnd: async (evt) => { 
+      // ... (排序逻辑未修改, 已包含 show/hide loader)
       const movedItem = items[evt.oldIndex]; 
       const masterIndex = allCloudItems.findIndex(it => it.id === movedItem.id);
       const [masterMovedItem] = allCloudItems.splice(masterIndex, 1);
@@ -576,12 +608,13 @@ function render(){
           }));
         }
       });
+      showLoader(); // 【修改】
       try {
         if(updates.length > 0) await Promise.all(updates);
       } catch (e) {
-        alert('保存排序失败: ' + e.message);
+        alert('保存排序失败: ' + e.message); // 排序失败用 alert，因为它不依赖弹窗
       } finally {
-        await loadCloudItems(); 
+        await loadCloudItems(); // loadCloudItems 会 hideLoader
       }
     }
   });
@@ -595,6 +628,7 @@ $('#f_type').onchange=syncTypeUI;
 $('#btnAdd').onclick=()=>{ 
   editingId=null; 
   fillForm(null); 
+  showDialogMsg('', false); // 【修改】清空错误
   $('#dlgTitle').textContent='新增项目'; 
   $('#btnDeleteInDialog').style.display = 'none';
   $('#dlg').style.display='flex'; 
@@ -604,11 +638,14 @@ $('#btnClose').onclick=()=>$('#dlg').style.display='none';
 $('#btnCancel').onclick=()=>$('#dlg').style.display='none'; 
 $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
 
+// --- 【修改】重写保存逻辑，集成 Loader 和 内部错误提示 ---
 $('#btnSave').onclick= async ()=>{ 
+  showDialogMsg('', false); // 清空消息
   const it = readForm(); 
-  if(!it) return;
+  if(!it) return; // readForm 会显示错误
   
   $('#btnSave').disabled = true;
+  showLoader();
   try {
     if (editingId) {
       const updatedItem = { ...it, id: editingId }; 
@@ -625,26 +662,31 @@ $('#btnSave').onclick= async ()=>{
       });
     }
     $('#dlg').style.display='none';
-    await loadCloudItems(); 
+    await loadCloudItems(); // loadCloudItems 会 hideLoader
   } catch (e) {
-    alert('保存失败: ' + e.message);
+    showDialogMsg(e.message || '保存失败'); // 在弹窗内显示错误
+    hideLoader(); // 出错时手动隐藏
   } finally {
     $('#btnSave').disabled = false;
   }
 };
 
+// --- 【修改】重写删除逻辑，集成 Loader 和 内部错误提示 ---
 $('#btnDeleteInDialog').onclick = async () => {
-  if (!editingId) return; // 安全检查
+  if (!editingId) return; 
   if (!confirm('确定要删除该项目吗？此操作无法撤销。')) return;
 
   const b = $('#btnDeleteInDialog');
   b.disabled = true;
+  showDialogMsg('', false);
+  showLoader();
   try {
     await api('/api/items?id=' + editingId, { method: 'DELETE' });
-    $('#dlg').style.display='none'; // 关闭弹窗
-    await loadCloudItems(); // 重新加载列表
+    $('#dlg').style.display='none'; // 仅成功时关闭
+    await loadCloudItems(); // loadCloudItems 会 hideLoader
   } catch (e) {
-    alert('删除失败: ' + e.message);
+    showDialogMsg(e.message || '删除失败'); // 在弹窗内显示错误
+    hideLoader(); // 出错时手动隐藏
   } finally {
     b.disabled = false;
   }
@@ -661,7 +703,7 @@ $('#btnClearSearch').onclick = () => {
 };
 $('#filter').onkeyup = e => { if (e.key === 'Enter') render(); };
 
-// 认证 API
+// 认证 API (未修改, 逻辑OK)
 async function api(path, init){
   const r = await fetch(path, { credentials:'include', ...init });
   const text = await r.text();
@@ -673,6 +715,7 @@ async function api(path, init){
       $('#btnUser').textContent = '登录/注册';
       $('#btnLogout').style.display = 'none';
       DlgAuth.show('login'); 
+      hideLoader(); // 【修改】如果401了，隐藏加载动画
     }
     const msg = data.reason ? `${data.error} (${data.reason})` : (data.error || `HTTP ${r.status}`);
     throw new Error(msg);
@@ -680,7 +723,7 @@ async function api(path, init){
   return data;
 }
 
-// 认证弹窗逻辑
+// 认证弹窗逻辑 (未修改, 逻辑OK)
 const DlgAuth = {
   el: $('#dlgAuth'),
   views: {
@@ -722,7 +765,7 @@ const DlgAuth = {
   }
 };
 
-// 认证按钮绑定
+// 认证按钮绑定 (未修改)
 $('#btnUser').onclick = () => {
   $('#login_em').value = ''; $('#login_pw').value = '';
   $('#reg_em').value = ''; $('#reg_pw').value = ''; $('#reg_code').value = '';
@@ -737,12 +780,21 @@ $('#btnGoLogin').onclick = () => DlgAuth.switchView('login');
 $('#btnGoLoginReset').onclick = () => DlgAuth.switchView('login');
 $('#btnGoReset').onclick = () => DlgAuth.switchView('reset');
 
+// --- 【修改】登出逻辑，添加 Loader ---
 $('#btnLogout').onclick = async () => {
   if (!confirm('确定要登出吗？')) return;
-  try { await api('/api/logout', { method: 'POST' }); location.reload(); } 
-  catch (e) { alert('登出失败: ' + e.message); }
+  showLoader();
+  try { 
+    await api('/api/logout', { method: 'POST' }); 
+    location.reload(); 
+  } 
+  catch (e) { 
+    alert('登出失败: ' + e.message); // 登出失败用 alert
+    hideLoader();
+  }
 };
 
+// --- 【修改】发送注册码，使用 /api/register-send-code ---
 $('#btnSendRegCode').onclick = async () => {
   const btn = $('#btnSendRegCode');
   const email = $('#reg_em').value.trim();
@@ -758,6 +810,7 @@ $('#btnSendRegCode').onclick = async () => {
   }
 };
 
+// --- 【修改】注册，使用 /api/register ---
 $('#goReg').onclick = async () => {
   const b = $('#goReg'); b.disabled = true; DlgAuth.showMsg('register', '');
   try {
@@ -771,8 +824,10 @@ $('#goReg').onclick = async () => {
   } finally { b.disabled = false; }
 };
 
+// --- 【修改】登录逻辑，集成 Loader ---
 $('#goLogin').onclick = async () => {
   const b = $('#goLogin'); b.disabled = true; DlgAuth.showMsg('login', '');
+  showLoader();
   try {
     await api('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('#login_em').value.trim(), password: $('#login_pw').value }) });
     const me = await api('/api/me');
@@ -780,12 +835,14 @@ $('#goLogin').onclick = async () => {
     $('#btnUser').textContent = me.email;
     $('#btnLogout').style.display = 'inline-block';
     DlgAuth.hide();
-    await loadCloudItems();
+    await loadCloudItems(); // loadCloudItems 会 hideLoader
   } catch (e) {
     DlgAuth.showMsg('login', e.message || '登录失败');
+    hideLoader();
   } finally { b.disabled = false; }
 };
 
+// 密码重置 (未修改)
 $('#btnSendResetCode').onclick = async () => {
   const btn = $('#btnSendResetCode');
   const email = $('#reset_em').value.trim();
@@ -814,7 +871,9 @@ $('#goReset').onclick = async () => {
   } finally { b.disabled = false; }
 };
 
+// --- 【修改】加载数据，集成 Loader ---
 async function loadCloudItems() {
+  showLoader();
   try {
     allCloudItems = await api('/api/items'); 
     allCloudItems.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -823,21 +882,27 @@ async function loadCloudItems() {
     }
     render(); 
   } catch (e) {
-    alert('加载数据失败: ' + e.message);
+    // 错误由 api() 函数处理 (401会弹出登录)
+    console.error('加载数据失败: ' + e.message);
+  } finally {
+    hideLoader();
   }
 }
 
+// --- 【修改】检查登录，集成 Loader ---
 async function checkLogin() {
+  showLoader();
   try {
     const me = await api('/api/me');
     ONLINE = true;
     $('#btnUser').textContent = me.email;
     $('#btnLogout').style.display = 'inline-block';
-    await loadCloudItems();
+    await loadCloudItems(); // loadCloudItems 会 hideLoader
   } catch (e) {
     ONLINE = false;
     $('#btnUser').textContent = '登录/注册';
     DlgAuth.show('login'); 
+    hideLoader(); // 登录失败时隐藏
   }
 }
 
