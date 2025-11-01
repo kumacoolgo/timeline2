@@ -22,15 +22,14 @@ function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1); }
 function MaxDate(a,b){ return a>b?a:b; }
 
-// ===【统一货币显示 · 方案 A】===
+// ===【统一货币显示 · 无小数】===
 function fmtMoney(amount, currency = 'CNY') {
   const n = Number(amount || 0);
-  const isJPY = currency === 'JPY';
-  const num = n.toLocaleString('zh-CN', {
-    minimumFractionDigits: isJPY ? 0 : 2,
-    maximumFractionDigits: isJPY ? 0 : 2
+  // 统一零小数，防换行（四舍五入）
+  const num = Math.round(n).toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   });
-
   // 固定符号，避免系统/浏览器差异
   const SYMBOL = {
     CNY: '￥',
@@ -48,12 +47,12 @@ function syncTypeUI(){
   $('#blockPlan').style.display = (t==='plan'||t==='insurance')?'block':'none';
   $('#blockWarranty').style.display = (t==='warranty')?'block':'none';
   $('#subBlockInsurance').style.display = (t==='insurance')?'block':'none';
-  // 年次：仅在 plan/insurance 下可选
   const cycle = $('#f_cycle')?.value || 'monthly';
   const showFiscal = (t==='plan' || t==='insurance') && cycle==='yearly';
   const fiscalWrap = $('#fiscalWrap'); if (fiscalWrap) fiscalWrap.style.display = showFiscal?'flex':'none';
 }
 
+// === 表单构建 ===
 function addPhase(i){
   const d=document.createElement('div');
   d.className='row-fields';
@@ -94,10 +93,9 @@ function readForm(){
     tags: ($('#f_tags').value || '').split(',').map(s=>s.trim()).filter(Boolean)
   };
 
-  // 新增：计费周期 / 决算月；出账日固定 1 号
   const cycle = ($('#f_cycle')?.value || 'monthly');
   const fiscalMonth = Number($('#f_fiscal')?.value || 1);
-  const billingDay = 1;
+  const billingDay = 1; // 固定为 1
 
   if(type==='warranty'){
     return { id:editingId||undefined, ...base, warrantyMonths:Number($('#f_wm').value)||0 };
@@ -112,8 +110,7 @@ function readForm(){
   }));
   return {
     id:editingId||undefined, ...base,
-    billingDay, // 固定为 1
-    cycle,
+    billingDay, cycle,
     fiscalMonth: cycle==='yearly' ? fiscalMonth : undefined,
     pricePhases: phases, cancelWindows: cancels,
     policyTermYears: Number($('#f_ins_y').value)||0,
@@ -130,7 +127,6 @@ function fillForm(it){
   $('#f_currency').value = it?.currency || 'CNY';
   $('#f_category').value = it?.category || '';
   $('#f_tags').value = (it?.tags||[]).join(', ');
-  // 周期/决算月
   if ($('#f_cycle')) $('#f_cycle').value = it?.cycle || 'monthly';
   if ($('#f_fiscal')) $('#f_fiscal').value = String(it?.fiscalMonth || (parseISODate(it?.startDate||'').getMonth()+1 || 1));
   $('#phaseList').innerHTML='';
@@ -142,7 +138,7 @@ function fillForm(it){
   syncTypeUI();
 }
 
-// 价格/退会计算
+// === 渲染与金额编辑 ===
 function resolvePlanPrice(sortedPhases, idx){
   if(!sortedPhases?.length) return null;
   let a=null; sortedPhases.forEach(p=>{ if(idx>=p.fromMonth) a=p.amount });
@@ -200,7 +196,7 @@ function render(){
     const div = document.createElement('div');
     div.className = `item ${it.id===activeId ? 'active':''}`;
     div.dataset.id = it.id;
-    div.setAttribute('draggable', 'true'); // 用原生 DnD 实现排序
+    div.setAttribute('draggable', 'true');
     div.innerHTML = `
       <div>
         <div class="title item-line-1">
@@ -254,14 +250,12 @@ function render(){
   L.addEventListener('drop', async e=>{
     e.preventDefault();
     const orderIds = Array.from(L.querySelectorAll('.item')).map(el=>el.dataset.id);
-    // 重排 master 列表
     const newAll = [];
     orderIds.forEach(id=>{
       const obj = allCloudItems.find(x=>x.id===id);
       if (obj) newAll.push(obj);
     });
     allCloudItems = newAll;
-    // 写回 order
     const updates = [];
     allCloudItems.forEach((it, idx)=>{
       const newOrder = idx+1;
@@ -324,7 +318,6 @@ function render(){
   }
   let maxEnd = startOfMonth(maxEndCandidate);
 
-  // 月序列
   const mlist=[]; let cur = new Date(minStart);
   while(cur<=maxEnd){ mlist.push(new Date(cur)); cur = addMonths(cur,1); }
 
@@ -380,6 +373,7 @@ function render(){
   setTimeout(()=>scrollToToday('auto'),0);
 
   // === 金额就地编辑 ===
+  const it = data[0];
   if (it.type!=='warranty'){
     $$('#grid .cell').forEach(cell=>{
       const idx = Number(cell.getAttribute('data-idx')||0);
@@ -435,13 +429,12 @@ function updatePhasesForEdit(phases, T, A, nextStart){
     if (!lastBefore || lastBefore.amount !== A) mid.push({ fromMonth:T, amount:A });
   }
   const out = [...before, ...mid, ...after];
-  // 合并相邻相同金额（按 fromMonth 升序）
   const merged = out
     .filter(Boolean)
     .sort((a,b)=>a.fromMonth-b.fromMonth)
     .reduce((acc,p)=>{
       const last = acc[acc.length-1];
-      if (last && last.amount===p.amount) return acc; // 相邻重复跳过
+      if (last && last.amount===p.amount) return acc;
       acc.push(p); return acc;
     }, []);
   return merged;
@@ -512,17 +505,16 @@ $('#btnClearSearch').onclick = ()=> {
 // === 自动搜索（防抖 & 兼容中文输入法）===
 const SEARCH_DEBOUNCE_MS = 200;
 let searchTimer = null;
-let isComposing = false; // 输入法合成中
+let isComposing = false;
 
 $('#filter').addEventListener('compositionstart', ()=>{ isComposing = true; });
 $('#filter').addEventListener('compositionend', ()=>{
   isComposing = false;
-  // 合成结束再执行一次
   clearTimeout(searchTimer);
   searchTimer = setTimeout(render, SEARCH_DEBOUNCE_MS);
 });
 $('#filter').addEventListener('input', ()=>{
-  if (isComposing) return; // 合成过程中不触发
+  if (isComposing) return;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(render, SEARCH_DEBOUNCE_MS);
 });
@@ -558,7 +550,6 @@ $('#fileImport').onchange = async (e)=>{
     hideLoader();
   }
 };
-// 统计
 $('#btnStats').onclick = ()=>{
   const c = $('#statsContent');
   c.innerHTML = buildStatsHTML(allCloudItems);
@@ -568,13 +559,11 @@ $('#btnCloseStats').onclick = ()=> $('#dlgStats').style.display='none';
 $('#dlgStats').addEventListener('click',e=>{ if(e.target.id==='dlgStats') $('#dlgStats').style.display='none'; });
 
 function buildStatsHTML(arr){
-  // 未来12个月各月总额（按各自货币分开汇总）
   const today = new Date(); const start = new Date(today.getFullYear(), today.getMonth(), 1);
   const months = Array.from({length:12}, (_,i)=> addMonths(start, i));
 
-  // currency -> monthIndex -> total
-  const totals = new Map(); // { currency -> number[12] }
-  const byCategory = new Map(); // { currency -> Map(category -> number) }
+  const totals = new Map();
+  const byCategory = new Map();
 
   for(const it of arr){
     const currency = it.currency || 'CNY';
@@ -589,15 +578,12 @@ function buildStatsHTML(arr){
     for(let i=0;i<12;i++){
       const idx = MonthIndex(months[i]);
       let val = 0;
-      if (it.type==='warranty'){
-        // 无月费
-      } else {
+      if (it.type!=='warranty'){
         const a = resolvePlanPrice(sorted, idx);
         if (a!=null && !isInCancel(it.cancelWindows, idx)) val = a;
       }
       totals.get(currency)[i] += val;
 
-      // 分类统计（只对有金额的类型统计）
       if(val>0){
         const cat = it.category || '未分类';
         const map = byCategory.get(currency);
@@ -625,7 +611,6 @@ function getCookie(name){
   const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + escaped + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : '';
 }
-
 function csrfToken(){ return getCookie('__Host-csrf') || getCookie('csrf'); }
 
 async function api(path, init){
@@ -751,7 +736,7 @@ $('#btnSendResetCode').onclick = async ()=>{
   if(!email) return DlgAuth.showMsg('reset','请输入注册邮箱');
   btn.disabled=true; DlgAuth.showMsg('reset','发送中...', true);
   try{
-    const d = await api('/api/password-reset-send-code', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email }) });
+    const d = await api('/api/password-reset-send-code', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ email }) });
     DlgAuth.showMsg('reset', d.message || '验证码已发送', true);
     DlgAuth.startCountdown(btn);
   }catch(e){ DlgAuth.showMsg('reset', e.message || '发送失败'); btn.disabled=false; }
@@ -760,7 +745,7 @@ $('#goReset').onclick = async ()=>{
   const b=$('#goReset'); b.disabled=true; DlgAuth.showMsg('reset','');
   try{
     const email=$('#reset_em').value.trim(), code=$('#reset_code').value.trim(), newPassword=$('#reset_pw').value;
-    await api('/api/password-reset-confirm', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email, code, newPassword }) });
+    await api('/api/password-reset-confirm', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ email, code, newPassword }) });
     DlgAuth.showMsg('reset','密码重置成功，请返回登录', true);
   }catch(e){ DlgAuth.showMsg('reset', e.message || '重置失败'); }
   finally{ b.disabled=false; }
