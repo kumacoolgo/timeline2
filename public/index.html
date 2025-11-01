@@ -85,7 +85,31 @@
     </div>
 
     <div id="blockPlan">
-      <div class="row" style="margin-top:6px"><label class="small">出账日</label><input id="f_bill" type="number" min="1" max="28" value="1" style="width:80px"/></div>
+      <!-- 计费周期 + 决算月 -->
+      <div class="row" style="margin-top:6px; align-items:center; gap:10px">
+        <label class="small" for="f_cycle">计费周期</label>
+        <select id="f_cycle" style="width:120px">
+          <option value="monthly">月次</option>
+          <option value="yearly">年次</option>
+        </select>
+        <div id="fiscalWrap" style="display:none; align-items:center; gap:8px">
+          <label class="small" for="f_fiscal">决算月</label>
+          <select id="f_fiscal" style="width:120px">
+            <option value="1">1 月</option>
+            <option value="2">2 月</option>
+            <option value="3">3 月</option>
+            <option value="4">4 月</option>
+            <option value="5">5 月</option>
+            <option value="6">6 月</option>
+            <option value="7">7 月</option>
+            <option value="8">8 月</option>
+            <option value="9">9 月</option>
+            <option value="10">10 月</option>
+            <option value="11">11 月</option>
+            <option value="12">12 月</option>
+          </select>
+        </div>
+      </div>
 
       <fieldset>
         <legend>金额（从第 X 个月起，金额 / 月）</legend>

@@ -34,6 +34,10 @@ function syncTypeUI(){
   $('#blockPlan').style.display = (t==='plan'||t==='insurance')?'block':'none';
   $('#blockWarranty').style.display = (t==='warranty')?'block':'none';
   $('#subBlockInsurance').style.display = (t==='insurance')?'block':'none';
+  // 年次：仅在 plan/insurance 下可选
+  const cycle = $('#f_cycle')?.value || 'monthly';
+  const showFiscal = (t==='plan' || t==='insurance') && cycle==='yearly';
+  const fiscalWrap = $('#fiscalWrap'); if (fiscalWrap) fiscalWrap.style.display = showFiscal?'flex':'none';
 }
 
 function addPhase(i){
@@ -76,6 +80,11 @@ function readForm(){
     tags: ($('#f_tags').value || '').split(',').map(s=>s.trim()).filter(Boolean)
   };
 
+  // 新增：计费周期 / 决算月；出账日固定 1 号
+  const cycle = ($('#f_cycle')?.value || 'monthly');
+  const fiscalMonth = Number($('#f_fiscal')?.value || 1);
+  const billingDay = 1;
+
   if(type==='warranty'){
     return { id:editingId||undefined, ...base, warrantyMonths:Number($('#f_wm').value)||0 };
   }
@@ -89,7 +98,9 @@ function readForm(){
   }));
   return {
     id:editingId||undefined, ...base,
-    billingDay: Number($('#f_bill').value)||1,
+    billingDay, // 固定为 1
+    cycle,
+    fiscalMonth: cycle==='yearly' ? fiscalMonth : undefined,
     pricePhases: phases, cancelWindows: cancels,
     policyTermYears: Number($('#f_ins_y').value)||0,
     policyTermMonths: Number($('#f_ins_m').value)||0
@@ -101,11 +112,13 @@ function fillForm(it){
   $('#f_name').value=it?.name||'';
   $('#f_number').value=it?.number||'';
   $('#f_start').value=it?.startDate||'';
-  $('#f_bill').value=it?.billingDay||1;
   $('#f_wm').value=it?.warrantyMonths||24;
   $('#f_currency').value = it?.currency || 'CNY';
   $('#f_category').value = it?.category || '';
   $('#f_tags').value = (it?.tags||[]).join(', ');
+  // 周期/决算月
+  if ($('#f_cycle')) $('#f_cycle').value = it?.cycle || 'monthly';
+  if ($('#f_fiscal')) $('#f_fiscal').value = String(it?.fiscalMonth || (parseISODate(it?.startDate||'').getMonth()+1 || 1));
   $('#phaseList').innerHTML='';
   $('#cancelList').innerHTML='';
   (it?.pricePhases?.length?it.pricePhases:[{fromMonth:1,amount:0}]).forEach(addPhase);
@@ -284,15 +297,15 @@ function render(){
     if (it.type==='insurance'){
       const policyMonths = (Number(it.policyTermYears)||0)*12 + (Number(it.policyTermMonths)||0);
       if (policyMonths>0){
-        const policyEndDate = addMonths(itemStartDate, policyMonths);
-        maxEndCandidate = MaxDate(maxEndCandidate, addMonths(policyEndDate, 12));
+        const endDate = addMonths(itemStartDate, policyMonths);
+        maxEndCandidate = MaxDate(maxEndCandidate, addMonths(endDate, 12));
       }
     }
   } else if (it.type==='warranty'){
     const wm = Number(it.warrantyMonths)||0;
     if (wm>0){
-      const warrantyEndDate = addMonths(itemStartDate, wm);
-      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(warrantyEndDate, 12));
+      const endDate = addMonths(itemStartDate, wm);
+      maxEndCandidate = MaxDate(maxEndCandidate, addMonths(endDate, 12));
     }
   }
   let maxEnd = startOfMonth(maxEndCandidate);
@@ -318,10 +331,13 @@ function render(){
   const MonthIndex = d => (d.getFullYear()-m0.getFullYear())*12 + d.getMonth()-m0.getMonth() + 1;
 
   const cells=[];
+  const cycle = it.cycle || 'monthly';
+  const fiscalMonth = Number(it.fiscalMonth || (parseISODate(it.startDate).getMonth()+1));
   for(let i=0;i<mlist.length;i++){
     const idx = MonthIndex(mlist[i]);
     const m = mlist[i];
     const isTodayMonth = (m.getFullYear()===todayY && m.getMonth()===todayM);
+    const isFiscalMonth = (cycle==='yearly') ? ((m.getMonth()+1) === fiscalMonth) : true;
     const contentDivStart = `<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;">`;
     const contentDivEnd = `</div>`;
 
@@ -330,7 +346,7 @@ function render(){
       let badge = '';
       if (idx>=1 && idx<=wm) badge = '<span class="badge">保修中</span>';
       else if (idx>wm && wm>0) badge = '<span class="badge cancel">保修外</span>';
-      cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" style="text-align:center;">${contentDivStart}${badge}${contentDivEnd}</div>`);
+      cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center;">${contentDivStart}${badge}${contentDivEnd}</div>`);
     } else {
       const amount = resolvePlanPrice(sortedPricePhases, idx);
       const cancel = isInCancel(it.cancelWindows, idx);
@@ -340,15 +356,43 @@ function render(){
         for(let j=0;j<sortedPricePhases.length;j++){ if(idx>=sortedPricePhases[j].fromMonth) seg=j; }
         segClass = (seg%2===0)?'amount-segment-1':'amount-segment-2';
       }
-      const amountHtml = amount!=null? `<div class="badge ${segClass}">${fmtMoney(amount, it.currency||'CNY')}</div>` : '';
+      const amountHtml = (amount!=null && isFiscalMonth)? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(amount, it.currency||'CNY')}</div>` : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
       const cancelHtml = cancel? `<div class="badge cancel">退会期</div>` : '';
-      cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" style="text-align:center;">${contentDivStart}${amountHtml}${cancelHtml}${contentDivEnd}</div>`);
+      cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center; cursor:pointer;">${contentDivStart}${amountHtml}${cancelHtml}${contentDivEnd}</div>`);
     }
   }
   grid.innerHTML = cells.join('');
 
   setTimeout(()=>scrollToToday('auto'),0);
+
+  // === 金额就地编辑 ===
+  if (it.type!=='warranty'){
+    $$('#grid .cell').forEach(cell=>{
+      const idx = Number(cell.getAttribute('data-idx')||0);
+      if (!idx) return;
+      cell.addEventListener('click', async (e)=>{
+        if (!e.currentTarget.contains(e.target)) return;
+        const sorted = (it.pricePhases || []).slice().sort((a,b)=>a.fromMonth-b.fromMonth);
+        const curAmount = resolvePlanPrice(sorted, idx);
+        const input = prompt(`设置从第 ${idx} 个月起（直到下一阶段前）的金额：`, curAmount!=null? String(curAmount) : '');
+        if (input==null) return;
+        let newAmount = Number(input);
+        if (Number.isNaN(newAmount) || newAmount<0){ alert('金额必须是非负数字'); return; }
+        const nextStart = (()=>{ const later = sorted.filter(p=>p.fromMonth>idx).map(p=>p.fromMonth); return later.length? Math.min(...later): Infinity; })();
+        const updated = updatePhasesForEdit(sorted, idx, newAmount, nextStart);
+        try{
+          showLoader();
+          await api('/api/items?id='+it.id, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({ pricePhases: updated }) });
+          await loadCloudItems();
+        }catch(err){
+          hideLoader();
+          alert('保存失败：'+(err.message||err));
+        }
+      });
+    });
+  }
 }
+
 function getDragAfterElement(container, y){
   const els = [...container.querySelectorAll('.item:not(.dragging)')];
   return els.reduce((closest, child)=>{
@@ -359,8 +403,40 @@ function getDragAfterElement(container, y){
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+// 将“点击第 T 个月 → 设置金额 A”转换为 pricePhases
+function updatePhasesForEdit(phases, T, A, nextStart){
+  const sorted = (phases||[]).slice().sort((a,b)=>a.fromMonth-b.fromMonth);
+  const prevAmount = resolvePlanPrice(sorted, T);
+  if (prevAmount === A) return sorted;
+
+  const before = sorted.filter(p=>p.fromMonth < T);
+  const after  = sorted.filter(p=>p.fromMonth >= nextStart);
+
+  let mid = [];
+  const hasT = sorted.find(p=>p.fromMonth===T);
+  if (hasT) {
+    mid = [{ fromMonth:T, amount:A }];
+  } else {
+    const lastBefore = before[before.length-1];
+    if (!lastBefore || lastBefore.amount !== A) mid.push({ fromMonth:T, amount:A });
+  }
+  const out = [...before, ...mid, ...after];
+  // 合并相邻相同金额（按 fromMonth 升序）
+  const merged = out
+    .filter(Boolean)
+    .sort((a,b)=>a.fromMonth-b.fromMonth)
+    .reduce((acc,p)=>{
+      const last = acc[acc.length-1];
+      if (last && last.amount===p.amount) return acc; // 相邻重复跳过
+      acc.push(p); return acc;
+    }, []);
+  return merged;
+}
+
 // 事件绑定 - 弹窗
 $('#f_type').onchange=syncTypeUI;
+$('#f_cycle')?.addEventListener('change', syncTypeUI);
+
 $('#btnAdd').onclick=()=>{
   editingId=null;
   fillForm(null);
@@ -531,7 +607,6 @@ function buildStatsHTML(arr){
 
 // === API 封装（含 CSRF 与错误统一） ===
 function getCookie(name){
-  // 用标准的正则转义：转义 . * + ? ^ $ { } ( ) | [ ] \
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + escaped + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : '';
@@ -554,7 +629,7 @@ async function api(path, init){
     const isAuthPath = ['/api/login','/api/register','/api/register-send-code','/api/password-reset-send-code','/api/password-reset-confirm','/api/csrf'].includes(path);
     if ((r.status===400) && isAuthPath) throw new Error(data.error || '操作失败，请检查输入');
     if (r.status===429) throw new Error(data.error || '请求过于频繁，请稍后再试');
-    if (r.status===403){ // CSRF / Origin
+    if (r.status===403){
       throw new Error(data.error || '安全验证失败，请刷新页面');
     }
     if (r.status===401 && !isAuthPath){
@@ -597,59 +672,6 @@ $('#btnLogout').onclick = async ()=>{
   catch(e){ alert('登出失败: '+e.message); hideLoader(); }
 };
 
-$('#btnSendRegCode').onclick = async ()=>{
-  const btn = $('#btnSendRegCode');
-  const email = $('#reg_em').value.trim();
-  if(!email) return DlgAuth.showMsg('register','请输入邮箱');
-  btn.disabled=true; DlgAuth.showMsg('register','发送中...', true);
-  try{
-    const d = await api('/api/register-send-code', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email }) });
-    DlgAuth.showMsg('register', d.message || '验证码已发送', true);
-    DlgAuth.startCountdown(btn);
-  }catch(e){ DlgAuth.showMsg('register', e.message || '发送失败'); btn.disabled=false; }
-};
-
-$('#goReg').onclick = async ()=>{
-  const b=$('#goReg'); b.disabled=true; DlgAuth.showMsg('register','');
-  try{
-    const email=$('#reg_em').value.trim(), password=$('#reg_pw').value, code=$('#reg_code').value.trim();
-    await api('/api/register', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email, password, code }) });
-    DlgAuth.showMsg('register','注册成功，请返回登录', true);
-  }catch(e){ DlgAuth.showMsg('register', e.message || '注册失败'); }
-  finally{ b.disabled=false; }
-};
-
-$('#goLogin').onclick = async ()=>{
-  const b=$('#goLogin'); b.disabled=true; DlgAuth.showMsg('login',''); showLoader();
-  try{
-    await api('/api/login', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email:$('#login_em').value.trim(), password:$('#login_pw').value }) });
-    const me = await api('/api/me');
-    ONLINE=true; $('#btnUser').textContent = me.email; $('#btnLogout').style.display='inline-block'; DlgAuth.hide(); await loadCloudItems();
-  }catch(e){ DlgAuth.showMsg('login', e.message || '登录失败'); hideLoader(); }
-  finally{ b.disabled=false; }
-};
-
-$('#btnSendResetCode').onclick = async ()=>{
-  const btn=$('#btnSendResetCode'); const email=$('#reset_em').value.trim();
-  if(!email) return DlgAuth.showMsg('reset','请输入注册邮箱');
-  btn.disabled=true; DlgAuth.showMsg('reset','发送中...', true);
-  try{
-    const d = await api('/api/password-reset-send-code', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email }) });
-    DlgAuth.showMsg('reset', d.message || '验证码已发送', true);
-    DlgAuth.startCountdown(btn);
-  }catch(e){ DlgAuth.showMsg('reset', e.message || '发送失败'); btn.disabled=false; }
-};
-
-$('#goReset').onclick = async ()=>{
-  const b=$('#goReset'); b.disabled=true; DlgAuth.showMsg('reset','');
-  try{
-    const email=$('#reset_em').value.trim(), code=$('#reset_code').value.trim(), newPassword=$('#reset_pw').value;
-    await api('/api/password-reset-confirm', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email, code, newPassword }) });
-    DlgAuth.showMsg('reset','密码重置成功，请返回登录', true);
-  }catch(e){ DlgAuth.showMsg('reset', e.message || '重置失败'); }
-  finally{ b.disabled=false; }
-};
-
 // === 启动：确保 CSRF + 检查登录 ===
 async function ensureCsrf(){
   if (!getCookie('__Host-csrf') && !getCookie('csrf')){
@@ -679,3 +701,53 @@ async function checkLogin(){
 
 async function bootstrap(){ await ensureCsrf(); checkLogin(); }
 bootstrap();
+
+// ====== 登录/注册/重置交互 ======
+$('#btnSendRegCode').onclick = async ()=>{
+  const btn = $('#btnSendRegCode');
+  const email = $('#reg_em').value.trim();
+  if(!email) return DlgAuth.showMsg('register','请输入邮箱');
+  btn.disabled=true; DlgAuth.showMsg('register','发送中...', true);
+  try{
+    const d = await api('/api/register-send-code', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email }) });
+    DlgAuth.showMsg('register', d.message || '验证码已发送', true);
+    DlgAuth.startCountdown(btn);
+  }catch(e){ DlgAuth.showMsg('register', e.message || '发送失败'); btn.disabled=false; }
+};
+$('#goReg').onclick = async ()=>{
+  const b=$('#goReg'); b.disabled=true; DlgAuth.showMsg('register','');
+  try{
+    const email=$('#reg_em').value.trim(), password=$('#reg_pw').value, code=$('#reg_code').value.trim();
+    await api('/api/register', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email, password, code }) });
+    DlgAuth.showMsg('register','注册成功，请返回登录', true);
+  }catch(e){ DlgAuth.showMsg('register', e.message || '注册失败'); }
+  finally{ b.disabled=false; }
+};
+$('#goLogin').onclick = async ()=>{
+  const b=$('#goLogin'); b.disabled=true; DlgAuth.showMsg('login',''); showLoader();
+  try{
+    await api('/api/login', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email:$('#login_em').value.trim(), password:$('#login_pw').value }) });
+    const me = await api('/api/me');
+    ONLINE=true; $('#btnUser').textContent = me.email; $('#btnLogout').style.display='inline-block'; DlgAuth.hide(); await loadCloudItems();
+  }catch(e){ DlgAuth.showMsg('login', e.message || '登录失败'); hideLoader(); }
+  finally{ b.disabled=false; }
+};
+$('#btnSendResetCode').onclick = async ()=>{
+  const btn=$('#btnSendResetCode'); const email=$('#reset_em').value.trim();
+  if(!email) return DlgAuth.showMsg('reset','请输入注册邮箱');
+  btn.disabled=true; DlgAuth.showMsg('reset','发送中...', true);
+  try{
+    const d = await api('/api/password-reset-send-code', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email }) });
+    DlgAuth.showMsg('reset', d.message || '验证码已发送', true);
+    DlgAuth.startCountdown(btn);
+  }catch(e){ DlgAuth.showMsg('reset', e.message || '发送失败'); btn.disabled=false; }
+};
+$('#goReset').onclick = async ()=>{
+  const b=$('#goReset'); b.disabled=true; DlgAuth.showMsg('reset','');
+  try{
+    const email=$('#reset_em').value.trim(), code=$('#reset_code').value.trim(), newPassword=$('#reset_pw').value;
+    await api('/api/password-reset-confirm', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email, code, newPassword }) });
+    DlgAuth.showMsg('reset','密码重置成功，请返回登录', true);
+  }catch(e){ DlgAuth.showMsg('reset', e.message || '重置失败'); }
+  finally{ b.disabled=false; }
+};
