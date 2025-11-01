@@ -22,10 +22,24 @@ function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1); }
 function MaxDate(a,b){ return a>b?a:b; }
 
-// 金额
-function fmtMoney(amount, currency='CNY'){
-  try { return new Intl.NumberFormat(undefined, { style:'currency', currency }).format(Number(amount||0)); }
-  catch { const sym = currency==='USD'?'$':currency==='EUR'?'€':currency==='JPY'?'¥':'￥'; return sym + ' ' + Number(amount||0).toLocaleString(); }
+// ===【统一货币显示 · 方案 A】===
+function fmtMoney(amount, currency = 'CNY') {
+  const n = Number(amount || 0);
+  const isJPY = currency === 'JPY';
+  const num = n.toLocaleString('zh-CN', {
+    minimumFractionDigits: isJPY ? 0 : 2,
+    maximumFractionDigits: isJPY ? 0 : 2
+  });
+
+  // 固定符号，避免系统/浏览器差异
+  const SYMBOL = {
+    CNY: '￥',
+    JPY: 'JP￥',
+    USD: '$',
+    EUR: '€'
+  };
+  const sym = SYMBOL[currency] ?? (currency + ' ');
+  return `${sym} ${num}`;
 }
 
 // 类型相关 UI
