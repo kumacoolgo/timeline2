@@ -25,18 +25,11 @@ function MaxDate(a,b){ return a>b?a:b; }
 // ===【统一货币显示 · 无小数】===
 function fmtMoney(amount, currency = 'CNY') {
   const n = Number(amount || 0);
-  // 统一零小数，防换行（四舍五入）
   const num = Math.round(n).toLocaleString('zh-CN', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   });
-  // 固定符号，避免系统/浏览器差异
-  const SYMBOL = {
-    CNY: '￥',
-    JPY: 'JP￥',
-    USD: '$',
-    EUR: '€'
-  };
+  const SYMBOL = { CNY: '￥', JPY: 'JP￥', USD: '$', EUR: '€' };
   const sym = SYMBOL[currency] ?? (currency + ' ');
   return `${sym} ${num}`;
 }
@@ -372,15 +365,15 @@ function render(){
 
   setTimeout(()=>scrollToToday('auto'),0);
 
-  // === 金额就地编辑 ===
-  const it = data[0];
-  if (it.type!=='warranty'){
+  // === 金额就地编辑（修复重名：使用 curItem）===
+  const curItem = data[0];
+  if (curItem.type!=='warranty'){
     $$('#grid .cell').forEach(cell=>{
       const idx = Number(cell.getAttribute('data-idx')||0);
       if (!idx) return;
       cell.addEventListener('click', async (e)=>{
         if (!e.currentTarget.contains(e.target)) return;
-        const sorted = (it.pricePhases || []).slice().sort((a,b)=>a.fromMonth-b.fromMonth);
+        const sorted = (curItem.pricePhases || []).slice().sort((a,b)=>a.fromMonth-b.fromMonth);
         const curAmount = resolvePlanPrice(sorted, idx);
         const input = prompt(`设置从第 ${idx} 个月起（直到下一阶段前）的金额：`, curAmount!=null? String(curAmount) : '');
         if (input==null) return;
@@ -390,7 +383,7 @@ function render(){
         const updated = updatePhasesForEdit(sorted, idx, newAmount, nextStart);
         try{
           showLoader();
-          await api('/api/items?id='+it.id, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({ pricePhases: updated }) });
+          await api('/api/items?id='+curItem.id, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({ pricePhases: updated }) });
           await loadCloudItems();
         }catch(err){
           hideLoader();
@@ -599,7 +592,7 @@ function buildStatsHTML(arr){
 
   const sectionCats = [...byCategory.entries()].map(([cur, map])=>{
     const rows = [...map.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=> `<tr><td>${k}</td><td style="text-align:right">${fmtMoney(v, cur)}</td></tr>`).join('');
-    return `<div class="card"><b>分类汇总（${cur}）</b><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr><th style="text-align:left">分类</th><th style="text-align:right">合计</th></tr></thead><tbody>${rows||'<tr><td colspan=2 class="small">暂无数据</td></tr>'}</tbody></table></div>`;
+    return `<div class="card"><b>分类汇总（${cur}）</b><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr><th style="text-align:left">分类</th><th style="text-align:right">合计</th></tr></thead><tbody>${rows||'<tr><td colspan=2 class="小">暂无数据</td></tr>'}</tbody></table></div>`;
   }).join('');
 
   return `<div class="row" style="flex-direction:column;gap:10px">${sectionMonths}${sectionCats}</div>`;
@@ -628,9 +621,7 @@ async function api(path, init){
     const isAuthPath = ['/api/login','/api/register','/api/register-send-code','/api/password-reset-send-code','/api/password-reset-confirm','/api/csrf'].includes(path);
     if ((r.status===400) && isAuthPath) throw new Error(data.error || '操作失败，请检查输入');
     if (r.status===429) throw new Error(data.error || '请求过于频繁，请稍后再试');
-    if (r.status===403){
-      throw new Error(data.error || '安全验证失败，请刷新页面');
-    }
+    if (r.status===403){ throw new Error(data.error || '安全验证失败，请刷新页面'); }
     if (r.status===401 && !isAuthPath){
       ONLINE=false; $('#btnUser').textContent='登录/注册'; $('#btnLogout').style.display='none';
       DlgAuth.show('login'); hideLoader();
