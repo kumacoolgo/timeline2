@@ -163,33 +163,28 @@ function scrollToToday(behavior='smooth'){
   }
 }
 
-// 余额抵扣后：返回 { charge, remainAfter }
+// 余额按月扣减，但不改变每月应收金额
+// 返回 { amount, remainAfter }
 function applyBalanceForMonth(item, sortedPhases, m0, idx) {
+  const amount = resolvePlanPrice(sortedPhases, idx);
   const bal = Number(item.balance || 0);
   const fromIdx = Number(item.balanceFrom || 0);
+
   if (!bal || !fromIdx || idx < fromIdx) {
-    const a = resolvePlanPrice(sortedPhases, idx);
-    return { charge: a==null?null:a, remainAfter: bal };
+    return { amount: amount==null?null:amount, remainAfter: bal };
   }
-  // 累计从 balanceFrom 到当前 idx 的抵扣
+
+  // 从 balanceFrom 开始，逐月用应收金额扣减余额（不管显示是否在退会期，只有 amount>0 才会扣）
   let remain = bal;
-  for (let i = fromIdx; i <= idx; i++){
+  for (let i = fromIdx; i <= idx; i++) {
     const a = resolvePlanPrice(sortedPhases, i);
-    if (a==null) continue;
-    const cover = Math.min(remain, a);
-    const charge = Math.max(0, a - cover);
-    remain -= cover;
-    if (i === idx) return { charge, remainAfter: remain };
-    if (remain <= 0) { // 余额已用尽，后续全额
-      if (i < idx) {
-        // 快速返回：到下一次循环 charge=a, remainAfter=0 …但这里只在末月返回
-      }
+    if (a != null && a > 0) {
+      remain = Math.max(0, remain - a);
     }
   }
-  // 如果期间没有金额或循环未命中，返回当前金额
-  const a = resolvePlanPrice(sortedPhases, idx);
-  return { charge: a==null?null:a, remainAfter: remain };
+  return { amount: amount==null?null:amount, remainAfter: remain };
 }
+
 
 // 渲染
 function render(){
@@ -389,20 +384,23 @@ function render(){
       cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center;">${contentDivStart}${badge}${contentDivEnd}</div>`);
     } else {
       // 计算抵扣后的显示金额 + 剩余余额
-      const { charge, remainAfter } = applyBalanceForMonth(it, sortedPricePhases, m0, idx);
-      const cancel = isInCancel(it.cancelWindows, idx);
-      let segClass = '';
-      if (charge!=null){
-        let seg=0;
-        for(let j=0;j<sortedPricePhases.length;j++){ if(idx>=sortedPricePhases[j].fromMonth) seg=j; }
-        segClass = (seg%2===0)?'amount-segment-1':'amount-segment-2';
-      }
-      const amountHtml = (charge!=null && isFiscalMonth)
-        ? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(charge, it.currency||'CNY')}</div>`
-        : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
-      const balanceHtml = (Number(it.balance||0)>0 && isFiscalMonth)
-        ? `<div class="small" style="margin-top:2px;color:#667085">余额：${fmtMoney(Math.max(0, remainAfter), it.currency||'CNY')}</div>`
-        : '';
+	// 计算本月应收金额 + 余额剩余
+	const { amount, remainAfter } = applyBalanceForMonth(it, sortedPricePhases, m0, idx);
+	const cancel = isInCancel(it.cancelWindows, idx);
+	let segClass = '';
+	if (amount != null){
+	  let seg=0;
+	  for(let j=0;j<sortedPricePhases.length;j++){ if(idx>=sortedPricePhases[j].fromMonth) seg=j; }
+	  segClass = (seg%2===0)?'amount-segment-1':'amount-segment-2';
+	}
+	const amountHtml = (amount!=null && isFiscalMonth)
+	  ? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(amount, it.currency||'CNY')}</div>`
+	  : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
+
+	const balanceHtml = (Number(it.balance||0)>0 && isFiscalMonth)
+	  ? `<div class="small" style="margin-top:2px;color:#667085">余额：${fmtMoney(Math.max(0, remainAfter), it.currency||'CNY')}</div>`
+  : '';
+
       const cancelHtml = cancel? `<div class="badge cancel">退会期</div>` : '';
       cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center; cursor:pointer;">${contentDivStart}${amountHtml}${balanceHtml}${cancelHtml}${contentDivEnd}</div>`);
     }
@@ -653,7 +651,11 @@ function buildStatsHTML(arr){
       let val = 0;
       if (it.type!=='warranty'){
         // 统计中也考虑余额抵扣
-        const { charge } = applyBalanceForMonth(it, sorted, m0, idx);
+        const amountInfo = applyBalanceForMonth(it, sorted, m0, idx);
+        const rawAmount = amountInfo.amount;
+
+        // 仍然跳过退会期
+        if (rawAmount != null && !isInCancel(it.cancelWindows, idx)) val = rawAmount;
         if (charge!=null && !isInCancel(it.cancelWindows, idx)) val = charge;
       }
       totals.get(currency)[i] += val;
