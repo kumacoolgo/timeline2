@@ -6,6 +6,17 @@ let allCloudItems = [];
 let items = [];
 let activeId = null, editingId = null, ONLINE = false;
 
+// 语言
+let LANG = localStorage.getItem('lang') || 'zh';
+const LANG_SHORT = { zh:'中', en:'En', ja:'日' };
+function setLang(l){
+  LANG = ['zh','en','ja'].includes(l) ? l : 'zh';
+  localStorage.setItem('lang', LANG);
+  const btn = $('#btnLang'); if (btn) btn.textContent = LANG_SHORT[LANG] || '中';
+  const menu = $('#langMenu'); if (menu) menu.setAttribute('aria-hidden','true');
+  render();
+}
+
 // Loader
 const $loader = $('#loader');
 function showLoader(){ $loader.style.display = 'flex'; }
@@ -22,10 +33,11 @@ function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1); }
 function MaxDate(a,b){ return a>b?a:b; }
 
-// ===【统一货币显示 · 无小数】===
+// === 统一货币显示（无小数 + 固定符号）===
 function fmtMoney(amount, currency = 'CNY') {
   const n = Number(amount || 0);
-  const num = Math.round(n).toLocaleString('zh-CN', {
+  const locales = { zh:'zh-CN', en:'en-US', ja:'ja-JP' };
+  const num = Math.round(n).toLocaleString(locales[LANG] || 'zh-CN', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   });
@@ -131,7 +143,7 @@ function fillForm(it){
   syncTypeUI();
 }
 
-// === 渲染与金额编辑 ===
+// === 渲染/计算 ===
 function resolvePlanPrice(sortedPhases, idx){
   if(!sortedPhases?.length) return null;
   let a=null; sortedPhases.forEach(p=>{ if(idx>=p.fromMonth) a=p.amount });
@@ -149,6 +161,34 @@ function scrollToToday(behavior='smooth'){
     const target = head.offsetLeft - gridContainer.offsetLeft - 10;
     gridContainer.scrollTo({ left: Math.max(0, target), behavior });
   }
+}
+
+// 余额抵扣后：返回 { charge, remainAfter }
+function applyBalanceForMonth(item, sortedPhases, m0, idx) {
+  const bal = Number(item.balance || 0);
+  const fromIdx = Number(item.balanceFrom || 0);
+  if (!bal || !fromIdx || idx < fromIdx) {
+    const a = resolvePlanPrice(sortedPhases, idx);
+    return { charge: a==null?null:a, remainAfter: bal };
+  }
+  // 累计从 balanceFrom 到当前 idx 的抵扣
+  let remain = bal;
+  for (let i = fromIdx; i <= idx; i++){
+    const a = resolvePlanPrice(sortedPhases, i);
+    if (a==null) continue;
+    const cover = Math.min(remain, a);
+    const charge = Math.max(0, a - cover);
+    remain -= cover;
+    if (i === idx) return { charge, remainAfter: remain };
+    if (remain <= 0) { // 余额已用尽，后续全额
+      if (i < idx) {
+        // 快速返回：到下一次循环 charge=a, remainAfter=0 …但这里只在末月返回
+      }
+    }
+  }
+  // 如果期间没有金额或循环未命中，返回当前金额
+  const a = resolvePlanPrice(sortedPhases, idx);
+  return { charge: a==null?null:a, remainAfter: remain };
 }
 
 // 渲染
@@ -348,24 +388,30 @@ function render(){
       else if (idx>wm && wm>0) badge = '<span class="badge cancel">保修外</span>';
       cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center;">${contentDivStart}${badge}${contentDivEnd}</div>`);
     } else {
-      const amount = resolvePlanPrice(sortedPricePhases, idx);
+      // 计算抵扣后的显示金额 + 剩余余额
+      const { charge, remainAfter } = applyBalanceForMonth(it, sortedPricePhases, m0, idx);
       const cancel = isInCancel(it.cancelWindows, idx);
       let segClass = '';
-      if (amount!=null){
+      if (charge!=null){
         let seg=0;
         for(let j=0;j<sortedPricePhases.length;j++){ if(idx>=sortedPricePhases[j].fromMonth) seg=j; }
         segClass = (seg%2===0)?'amount-segment-1':'amount-segment-2';
       }
-      const amountHtml = (amount!=null && isFiscalMonth)? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(amount, it.currency||'CNY')}</div>` : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
+      const amountHtml = (charge!=null && isFiscalMonth)
+        ? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(charge, it.currency||'CNY')}</div>`
+        : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
+      const balanceHtml = (Number(it.balance||0)>0 && isFiscalMonth)
+        ? `<div class="small" style="margin-top:2px;color:#667085">余额：${fmtMoney(Math.max(0, remainAfter), it.currency||'CNY')}</div>`
+        : '';
       const cancelHtml = cancel? `<div class="badge cancel">退会期</div>` : '';
-      cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center; cursor:pointer;">${contentDivStart}${amountHtml}${cancelHtml}${contentDivEnd}</div>`);
+      cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center; cursor:pointer;">${contentDivStart}${amountHtml}${balanceHtml}${cancelHtml}${contentDivEnd}</div>`);
     }
   }
   grid.innerHTML = cells.join('');
 
   setTimeout(()=>scrollToToday('auto'),0);
 
-  // === 金额就地编辑（修复重名：使用 curItem）===
+  // 金额就地编辑（支持余额）
   const curItem = data[0];
   if (curItem.type!=='warranty'){
     $$('#grid .cell').forEach(cell=>{
@@ -379,11 +425,32 @@ function render(){
         if (input==null) return;
         let newAmount = Number(input);
         if (Number.isNaN(newAmount) || newAmount<0){ alert('金额必须是非负数字'); return; }
+
+        // 第二个输入：余额（可选）
+        const hasExistingBal = Number(curItem.balance||0)>0 && idx >= Number(curItem.balanceFrom||Infinity);
+        const balInput = prompt('可选：设置余额（从本月开始按月抵扣，留空不变，0 取消余额）', hasExistingBal ? String(curItem.balance) : '');
+        let balancePatch = {};
+        if (balInput !== null) {
+          const trimmed = balInput.trim();
+          if (trimmed==='') {
+            // 不改
+          } else {
+            const bal = Math.max(0, Number(trimmed));
+            if (Number.isNaN(bal)) { alert('余额需为数字'); return; }
+            balancePatch = { balance: bal, balanceFrom: idx };
+          }
+        }
+
         const nextStart = (()=>{ const later = sorted.filter(p=>p.fromMonth>idx).map(p=>p.fromMonth); return later.length? Math.min(...later): Infinity; })();
         const updated = updatePhasesForEdit(sorted, idx, newAmount, nextStart);
+
         try{
           showLoader();
-          await api('/api/items?id='+curItem.id, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify({ pricePhases: updated }) });
+          await api('/api/items?id='+curItem.id, {
+            method:'PUT',
+            headers:{'content-type':'application/json'},
+            body: JSON.stringify({ pricePhases: updated, ...balancePatch })
+          });
           await loadCloudItems();
         }catch(err){
           hideLoader();
@@ -495,6 +562,19 @@ $('#btnClearSearch').onclick = ()=> {
   $('#filter').focus();
 };
 
+// 语言切换事件
+$('#btnLang')?.addEventListener('click', ()=>{
+  const menu = $('#langMenu');
+  const opened = menu.getAttribute('aria-hidden') === 'false';
+  menu.setAttribute('aria-hidden', opened ? 'true' : 'false');
+  $('#btnLang').setAttribute('aria-expanded', opened ? 'false' : 'true');
+});
+$('#langMenu')?.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-lang]');
+  if (!btn) return;
+  setLang(btn.getAttribute('data-lang'));
+});
+
 // === 自动搜索（防抖 & 兼容中文输入法）===
 const SEARCH_DEBOUNCE_MS = 200;
 let searchTimer = null;
@@ -572,8 +652,9 @@ function buildStatsHTML(arr){
       const idx = MonthIndex(months[i]);
       let val = 0;
       if (it.type!=='warranty'){
-        const a = resolvePlanPrice(sorted, idx);
-        if (a!=null && !isInCancel(it.cancelWindows, idx)) val = a;
+        // 统计中也考虑余额抵扣
+        const { charge } = applyBalanceForMonth(it, sorted, m0, idx);
+        if (charge!=null && !isInCancel(it.cancelWindows, idx)) val = charge;
       }
       totals.get(currency)[i] += val;
 
@@ -592,7 +673,7 @@ function buildStatsHTML(arr){
 
   const sectionCats = [...byCategory.entries()].map(([cur, map])=>{
     const rows = [...map.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=> `<tr><td>${k}</td><td style="text-align:right">${fmtMoney(v, cur)}</td></tr>`).join('');
-    return `<div class="card"><b>分类汇总（${cur}）</b><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr><th style="text-align:left">分类</th><th style="text-align:right">合计</th></tr></thead><tbody>${rows||'<tr><td colspan=2 class="小">暂无数据</td></tr>'}</tbody></table></div>`;
+    return `<div class="card"><b>分类汇总（${cur}）</b><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr><th style="text-align:left">分类</th><th style="text-align:right">合计</th></tr></thead><tbody>${rows||'<tr><td colspan=2 class="small">暂无数据</td></tr>'}</tbody></table></div>`;
   }).join('');
 
   return `<div class="row" style="flex-direction:column;gap:10px">${sectionMonths}${sectionCats}</div>`;
@@ -689,7 +770,11 @@ async function checkLogin(){
   }
 }
 
-async function bootstrap(){ await ensureCsrf(); checkLogin(); }
+async function bootstrap(){
+  setLang(LANG); // 初始化按钮文字
+  await ensureCsrf();
+  checkLogin();
+}
 bootstrap();
 
 // ====== 登录/注册/重置交互 ======

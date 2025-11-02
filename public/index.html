@@ -15,6 +15,16 @@
     <div class="row" style="justify-content: space-between;">
       <b>费用时间轴</b>
       <div class="auth-group">
+        <!-- 语言切换 -->
+        <div class="lang-switch">
+          <button id="btnLang" class="ghost" aria-haspopup="menu" aria-expanded="false">中</button>
+          <div id="langMenu" class="lang-menu" role="menu" aria-hidden="true">
+            <button type="button" data-lang="zh" role="menuitem">中文</button>
+            <button type="button" data-lang="en" role="menuitem">English</button>
+            <button type="button" data-lang="ja" role="menuitem">Japanese</button>
+          </div>
+        </div>
+
         <button id="btnUser" class="ghost" aria-label="登录或注册">登录/注册</button>
         <button id="btnLogout" class="ghost" style="display:none">登出</button>
       </div>
@@ -85,28 +95,20 @@
     </div>
 
     <div id="blockPlan">
-      <!-- 计费周期 + 决算月 -->
-      <div class="row" style="margin-top:6px; align-items:center; gap:10px">
-        <label class="small" for="f_cycle">计费周期</label>
-        <select id="f_cycle" style="width:120px">
-          <option value="monthly">月次</option>
+      <!-- 年次/决算月（在月度/年次间切换） -->
+      <div class="row" style="gap:10px; margin-top: 8px;">
+        <label class="small">周期</label>
+        <select id="f_cycle" style="width: 120px;">
+          <option value="monthly">月度</option>
           <option value="yearly">年次</option>
         </select>
-        <div id="fiscalWrap" style="display:none; align-items:center; gap:8px">
-          <label class="small" for="f_fiscal">决算月</label>
-          <select id="f_fiscal" style="width:120px">
-            <option value="1">1 月</option>
-            <option value="2">2 月</option>
-            <option value="3">3 月</option>
-            <option value="4">4 月</option>
-            <option value="5">5 月</option>
-            <option value="6">6 月</option>
-            <option value="7">7 月</option>
-            <option value="8">8 月</option>
-            <option value="9">9 月</option>
-            <option value="10">10 月</option>
-            <option value="11">11 月</option>
-            <option value="12">12 月</option>
+        <div id="fiscalWrap" class="row" style="gap:6px; display:none;">
+          <label class="small">决算月</label>
+          <select id="f_fiscal" style="width: 120px;">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
           </select>
         </div>
       </div>
