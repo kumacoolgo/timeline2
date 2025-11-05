@@ -9,10 +9,127 @@ let activeId = null, editingId = null, ONLINE = false;
 // 语言
 let LANG = localStorage.getItem('lang') || 'zh';
 const LANG_SHORT = { zh:'中', en:'En', ja:'日' };
+
+// --- i18n 词典 ---
+const I18N = {
+  zh: {
+    title:'费用时间轴',
+    login_register:'登录/注册', logout:'登出',
+    search_placeholder:'搜索项目/类型/编号/标签/分类...',
+    clear:'清空', this_month:'本月', add_item:'添加项目',
+    import:'导入', export:'导出', stats:'统计',
+    dialog_edit:'编辑项目', type_plan:'套餐', type_warranty:'保修', type_insurance:'保险',
+    name_placeholder:'项目名称', number_placeholder:'编号/卡号(可选)',
+    label_start:'开始日', label_currency:'货币',
+    category_placeholder:'分类（可选）', tags_placeholder:'标签，用逗号分隔（可选）',
+    label_cycle:'周期', cycle_monthly:'月度', cycle_yearly:'年次',
+    label_fiscal:'决算月', legend_amount:'金额（从第 X 个月起，金额 / 月）',
+    legend_cancel:'退会（从第 X ～ 第 Y 个月为退会期）',
+    label_term:'保期', years_placeholder:'年', months_placeholder:'月',
+    label_warranty_months:'保修期（月）',
+    delete:'删除', cancel:'取消', save:'保存',
+    stats_title:'统计与汇总',
+    login:'登录', register:'注册', forgot_pwd:'忘记密码？',
+    back_login:'返回登录', confirm_register:'确认注册',
+    reset_pwd:'重置密码', email:'邮箱', password:'密码', password10:'密码（≥10位）',
+    reg_email:'注册邮箱', new_password10:'新密码（≥10位）', confirm_reset:'确认重置',
+    code6:'6位验证码', send_code:'发送验证码',
+    left_hint:'请在左侧选择一个项目，或点击“添加项目”。',
+    plan_label:'套餐', insurance_label:'保险', warranty_label:'保修',
+    in_warranty:'保修中', out_warranty:'保修外', cancel_period:'退会期',
+    balance_prefix:'余额：',
+    prompt_amount:(idx,cur)=>`设置从第 ${idx} 个月起（直到下一阶段前）的金额：`,
+    prompt_balance:(has)=> has ? '可选：设置余额（从本月开始逐月显示剩余，留空不变，0 清除）' : '可选：设置余额（从本月开始逐月显示剩余）',
+    err_amount:'金额必须是非负数字',
+    err_load:'加载数据失败：'
+  },
+  en: {
+    title:'Expense Timeline',
+    login_register:'Sign in / Sign up', logout:'Sign out',
+    search_placeholder:'Search name/type/number/tag/category...',
+    clear:'Clear', this_month:'This month', add_item:'Add item',
+    import:'Import', export:'Export', stats:'Stats',
+    dialog_edit:'Edit Item', type_plan:'Plan', type_warranty:'Warranty', type_insurance:'Insurance',
+    name_placeholder:'Item name', number_placeholder:'No./Card (optional)',
+    label_start:'Start', label_currency:'Currency',
+    category_placeholder:'Category (optional)', tags_placeholder:'Tags, comma-separated (optional)',
+    label_cycle:'Cycle', cycle_monthly:'Monthly', cycle_yearly:'Yearly',
+    label_fiscal:'Fiscal Month', legend_amount:'Amount (from month X, amount / month)',
+    legend_cancel:'Cancel window (from month X to month Y)',
+    label_term:'Term', years_placeholder:'Years', months_placeholder:'Months',
+    label_warranty_months:'Warranty (months)',
+    delete:'Delete', cancel:'Cancel', save:'Save',
+    stats_title:'Statistics',
+    login:'Login', register:'Register', forgot_pwd:'Forgot password?',
+    back_login:'Back', confirm_register:'Create account',
+    reset_pwd:'Reset Password', email:'Email', password:'Password', password10:'Password (≥10 chars)',
+    reg_email:'Registered email', new_password10:'New password (≥10 chars)', confirm_reset:'Confirm reset',
+    code6:'6-digit code', send_code:'Send code',
+    left_hint:'Pick an item on the left, or click “Add item”.',
+    plan_label:'Plan', insurance_label:'Insurance', warranty_label:'Warranty',
+    in_warranty:'In warranty', out_warranty:'Out of warranty', cancel_period:'Cancel window',
+    balance_prefix:'Balance: ',
+    prompt_amount:(idx,cur)=>`Set amount from month ${idx} (until next phase):`,
+    prompt_balance:(has)=> has ? 'Optional balance (starts this month; empty = unchanged, 0 = clear)' : 'Optional balance (starts this month)',
+    err_amount:'Amount must be a non-negative number',
+    err_load:'Failed to load: '
+  },
+  ja: {
+    title:'費用タイムライン',
+    login_register:'ログイン/登録', logout:'ログアウト',
+    search_placeholder:'項目/タイプ/番号/タグ/カテゴリを検索…',
+    clear:'クリア', this_month:'今月', add_item:'項目を追加',
+    import:'インポート', export:'エクスポート', stats:'統計',
+    dialog_edit:'項目を編集', type_plan:'プラン', type_warranty:'保証', type_insurance:'保険',
+    name_placeholder:'項目名', number_placeholder:'番号/カード(任意)',
+    label_start:'開始日', label_currency:'通貨',
+    category_placeholder:'カテゴリ（任意）', tags_placeholder:'タグ（カンマ区切り・任意）',
+    label_cycle:'周期', cycle_monthly:'月次', cycle_yearly:'年次',
+    label_fiscal:'決算月', legend_amount:'金額（第Xヶ月から、月額）',
+    legend_cancel:'退会期間（第X～第Yヶ月）',
+    label_term:'契約期間', years_placeholder:'年', months_placeholder:'月',
+    label_warranty_months:'保証期間（月）',
+    delete:'削除', cancel:'キャンセル', save:'保存',
+    stats_title:'統計',
+    login:'ログイン', register:'登録', forgot_pwd:'パスワードをお忘れですか？',
+    back_login:'戻る', confirm_register:'登録を確定',
+    reset_pwd:'パスワード再設定', email:'メール', password:'パスワード', password10:'パスワード（10文字以上）',
+    reg_email:'登録メール', new_password10:'新しいパスワード（10文字以上）', confirm_reset:'再設定',
+    code6:'6桁コード', send_code:'コード送信',
+    left_hint:'左から項目を選択するか、「項目を追加」をクリックしてください。',
+    plan_label:'プラン', insurance_label:'保険', warranty_label:'保証',
+    in_warranty:'保証内', out_warranty:'保証外', cancel_period:'退会期間',
+    balance_prefix:'残高：',
+    prompt_amount:(idx,cur)=>`第 ${idx} ヶ月からの金額を設定：`,
+    prompt_balance:(has)=> has ? '任意：残高（当月から表示・空欄は変更なし、0でクリア）' : '任意：残高（当月から表示）',
+    err_amount:'金額は 0 以上の数値で入力してください',
+    err_load:'読み込みに失敗しました：'
+  }
+};
+
+// 应用 i18n：替换文本/占位符
+function applyI18n(){
+  const dict = I18N[LANG] || I18N.zh;
+  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : (LANG === 'ja' ? 'ja-JP' : 'en');
+  // 普通文本
+  $$('[data-i18n]').forEach(el=>{
+    const k = el.getAttribute('data-i18n');
+    if (k && dict[k]) el.textContent = dict[k];
+  });
+  // placeholder
+  $$('[data-i18n-placeholder]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-placeholder');
+    if (k && dict[k]) el.setAttribute('placeholder', dict[k]);
+  });
+  // 按钮简写
+  const btn = $('#btnLang'); if (btn) btn.textContent = ({zh:'中', en:'En', ja:'日'})[LANG] || '中';
+}
+
+// 设置语言
 function setLang(l){
   LANG = ['zh','en','ja'].includes(l) ? l : 'zh';
   localStorage.setItem('lang', LANG);
-  const btn = $('#btnLang'); if (btn) btn.textContent = LANG_SHORT[LANG] || '中';
+  applyI18n();
   const menu = $('#langMenu'); if (menu) menu.setAttribute('aria-hidden','true');
   render();
 }
@@ -33,14 +150,10 @@ function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function addMonths(d,n){ return new Date(d.getFullYear(), d.getMonth()+n, 1); }
 function MaxDate(a,b){ return a>b?a:b; }
 
-// === 统一货币显示（无小数 + 固定符号）===
+// === 统一货币显示（无小数 + 固定符号；与语言无关）===
 function fmtMoney(amount, currency = 'CNY') {
   const n = Number(amount || 0);
-  const locales = { zh:'zh-CN', en:'en-US', ja:'ja-JP' };
-  const num = Math.round(n).toLocaleString(locales[LANG] || 'zh-CN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  });
+  const num = Math.round(n).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const SYMBOL = { CNY: '￥', JPY: 'JP￥', USD: '$', EUR: '€' };
   const sym = SYMBOL[currency] ?? (currency + ' ');
   return `${sym} ${num}`;
@@ -84,12 +197,13 @@ $('#btnAddPhase').onclick=()=>addPhase();
 $('#btnAddCancel').onclick=()=>addCancel();
 
 function readForm(){
+  const dict = I18N[LANG];
   showDialogMsg('', true);
   const type = $('#f_type').value.trim();
   const name = $('#f_name').value.trim();
   const start = $('#f_start').value;
-  if(!name){ showDialogMsg('请填写项目名称'); return null; }
-  if(!start){ showDialogMsg('请选择开始日期'); return null; }
+  if(!name){ showDialogMsg(dict.name_placeholder); return null; }
+  if(!start){ showDialogMsg(dict.label_start); return null; }
 
   const base = {
     type, name, number: $('#f_number').value.trim(), startDate: start,
@@ -174,7 +288,6 @@ function applyBalanceForMonth(item, sortedPhases, m0, idx) {
     return { amount: amount==null?null:amount, remainAfter: bal };
   }
 
-  // 从 balanceFrom 开始，逐月用应收金额扣减余额（不管显示是否在退会期，只有 amount>0 才会扣）
   let remain = bal;
   for (let i = fromIdx; i <= idx; i++) {
     const a = resolvePlanPrice(sortedPhases, i);
@@ -185,9 +298,10 @@ function applyBalanceForMonth(item, sortedPhases, m0, idx) {
   return { amount: amount==null?null:amount, remainAfter: remain };
 }
 
-
 // 渲染
 function render(){
+  const dict = I18N[LANG] || I18N.zh;
+
   const term = $('#filter').value.trim().toLowerCase();
   if(!term) items = [...allCloudItems];
   else {
@@ -206,19 +320,19 @@ function render(){
 
   const frag = document.createDocumentFragment();
   items.forEach(it=>{
-    const typeLabel = it.type === 'plan' ? '<span class="small" style="color:#6b5cff">套餐</span>' :
-                      it.type === 'insurance' ? '<span class="small" style="color:#10b981">保险</span>' :
-                      '<span class="small" style="color:#3b82f6">保修</span>';
+    const typeLabel = it.type === 'plan' ? `<span class="small" style="color:#6b5cff">${dict.plan_label}</span>` :
+                      it.type === 'insurance' ? `<span class="small" style="color:#10b981">${dict.insurance_label}</span>` :
+                      `<span class="small" style="color:#3b82f6">${dict.warranty_label}</span>`;
 
     let subDetail = '';
     if (it.type === 'warranty') {
-      if (it.warrantyMonths) subDetail = `<span class="small" style="color:#3b82f6">保修期 ${it.warrantyMonths} 个月</span>`;
+      if (it.warrantyMonths) subDetail = `<span class="small" style="color:#3b82f6">${dict.label_warranty_months.replace('（月）','')} ${it.warrantyMonths}</span>`;
     } else if (it.type === 'plan') {
-      if (it.cancelWindows?.length>0) subDetail = `<span class="small" style="color:#6b5cff">退会期 第 ${it.cancelWindows[0].fromMonth} 个月</span>`;
+      if (it.cancelWindows?.length>0) subDetail = `<span class="small" style="color:#6b5cff">${dict.cancel_period} 第 ${it.cancelWindows[0].fromMonth} 个月</span>`;
     } else if (it.type === 'insurance') {
       const y = it.policyTermYears || 0, m = it.policyTermMonths || 0;
-      const termStr = (y>0?`${y}年`:'' ) + (m>0?`${m}个月`:'' );
-      if (termStr) subDetail = `<span class="small" style="color:#10b981">保期 ${termStr}</span>`;
+      const termStr = (y>0?`${y}${I18N.zh.years_placeholder}`:'' ) + (m>0?`${m}${I18N.zh.months_placeholder}`:'' );
+      if (termStr) subDetail = `<span class="small" style="color:#10b981">${dict.label_term} ${termStr}</span>`;
     }
 
     const div = document.createElement('div');
@@ -233,14 +347,14 @@ function render(){
           <span class="meta item-number">#${it.number||'-'}</span>
         </div>
         <div class="meta item-line-2">
-          <span>开始: ${it.startDate || '-'}</span>
+          <span>${dict.label_start}: ${it.startDate || '-'}</span>
           ${it.category ? `<span style="margin-left:8px;">· ${it.category}</span>` : ''}
           ${(it.tags?.length? `<span style="margin-left:8px;">· ${it.tags.join('/')}</span>`:'')}
         </div>
         <div class="meta item-line-3">${subDetail}</div>
       </div>
       <div class="ops">
-        <button class="ghost btnEdit" type="button">编辑</button>
+        <button class="ghost btnEdit" type="button" data-i18n="dialog_edit">${dict.dialog_edit}</button>
       </div>
     `;
     div.addEventListener('click', e=>{ if(e.target.closest('button')) return; activeId = it.id; render(); });
@@ -249,7 +363,7 @@ function render(){
       editingId = it.id;
       fillForm(allCloudItems.find(x=>x.id===it.id));
       showDialogMsg('', true);
-      $('#dlgTitle').textContent='编辑项目';
+      $('#dlgTitle').textContent = dict.dialog_edit;
       $('#btnDeleteInDialog').style.display = 'inline-block';
       $('#dlg').style.display='flex';
     };
@@ -306,7 +420,7 @@ function render(){
   const data = visibleItems();
   const head = $('#gridHead'), grid = $('#grid');
   if(!data.length){
-    head.innerHTML=''; grid.innerHTML='<div class=small>请在左侧选择一个项目，或点击“添加项目”。</div>'; return;
+    head.innerHTML=''; grid.innerHTML=`<div class=small>${dict.left_hint}</div>`; return;
   }
 
   const it = data[0];
@@ -379,29 +493,25 @@ function render(){
     if(it.type==='warranty'){
       const wm = Number(it.warrantyMonths||0);
       let badge = '';
-      if (idx>=1 && idx<=wm) badge = '<span class="badge">保修中</span>';
-      else if (idx>wm && wm>0) badge = '<span class="badge cancel">保修外</span>';
+      if (idx>=1 && idx<=wm) badge = `<span class="badge">${dict.in_warranty}</span>`;
+      else if (idx>wm && wm>0) badge = `<span class="badge cancel">${dict.out_warranty}</span>`;
       cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center;">${contentDivStart}${badge}${contentDivEnd}</div>`);
     } else {
-      // 计算抵扣后的显示金额 + 剩余余额
-	// 计算本月应收金额 + 余额剩余
-	const { amount, remainAfter } = applyBalanceForMonth(it, sortedPricePhases, m0, idx);
-	const cancel = isInCancel(it.cancelWindows, idx);
-	let segClass = '';
-	if (amount != null){
-	  let seg=0;
-	  for(let j=0;j<sortedPricePhases.length;j++){ if(idx>=sortedPricePhases[j].fromMonth) seg=j; }
-	  segClass = (seg%2===0)?'amount-segment-1':'amount-segment-2';
-	}
-	const amountHtml = (amount!=null && isFiscalMonth)
-	  ? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(amount, it.currency||'CNY')}</div>`
-	  : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
-
-	const balanceHtml = (Number(it.balance||0)>0 && isFiscalMonth)
-	  ? `<div class="small" style="margin-top:2px;color:#667085">余额：${fmtMoney(Math.max(0, remainAfter), it.currency||'CNY')}</div>`
-  : '';
-
-      const cancelHtml = cancel? `<div class="badge cancel">退会期</div>` : '';
+      const { amount, remainAfter } = applyBalanceForMonth(it, sortedPricePhases, m0, idx);
+      const cancel = isInCancel(it.cancelWindows, idx);
+      let segClass = '';
+      if (amount!=null){
+        let seg=0;
+        for(let j=0;j<sortedPricePhases.length;j++){ if(idx>=sortedPricePhases[j].fromMonth) seg=j; }
+        segClass = (seg%2===0)?'amount-segment-1':'amount-segment-2';
+      }
+      const amountHtml = (amount!=null && isFiscalMonth)
+        ? `<div class="badge ${segClass} editable-amount" title="点击修改">${fmtMoney(amount, it.currency||'CNY')}</div>`
+        : (isFiscalMonth ? `<div class="badge editable-amount" style="opacity:.6" title="点击新增或修改">—</div>` : '');
+      const balanceHtml = (Number(it.balance||0)>0 && isFiscalMonth)
+        ? `<div class="small" style="margin-top:2px;color:#667085">${dict.balance_prefix}${fmtMoney(Math.max(0, remainAfter), it.currency||'CNY')}</div>`
+        : '';
+      const cancelHtml = cancel? `<div class="badge cancel">${dict.cancel_period}</div>` : '';
       cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center; cursor:pointer;">${contentDivStart}${amountHtml}${balanceHtml}${cancelHtml}${contentDivEnd}</div>`);
     }
   }
@@ -419,14 +529,14 @@ function render(){
         if (!e.currentTarget.contains(e.target)) return;
         const sorted = (curItem.pricePhases || []).slice().sort((a,b)=>a.fromMonth-b.fromMonth);
         const curAmount = resolvePlanPrice(sorted, idx);
-        const input = prompt(`设置从第 ${idx} 个月起（直到下一阶段前）的金额：`, curAmount!=null? String(curAmount) : '');
+        const input = prompt(I18N[LANG].prompt_amount(idx, curAmount), curAmount!=null? String(curAmount) : '');
         if (input==null) return;
         let newAmount = Number(input);
-        if (Number.isNaN(newAmount) || newAmount<0){ alert('金额必须是非负数字'); return; }
+        if (Number.isNaN(newAmount) || newAmount<0){ alert(I18N[LANG].err_amount); return; }
 
         // 第二个输入：余额（可选）
         const hasExistingBal = Number(curItem.balance||0)>0 && idx >= Number(curItem.balanceFrom||Infinity);
-        const balInput = prompt('可选：设置余额（从本月开始按月抵扣，留空不变，0 取消余额）', hasExistingBal ? String(curItem.balance) : '');
+        const balInput = prompt(I18N[LANG].prompt_balance(hasExistingBal), hasExistingBal ? String(curItem.balance) : '');
         let balancePatch = {};
         if (balInput !== null) {
           const trimmed = balInput.trim();
@@ -434,7 +544,7 @@ function render(){
             // 不改
           } else {
             const bal = Math.max(0, Number(trimmed));
-            if (Number.isNaN(bal)) { alert('余额需为数字'); return; }
+            if (Number.isNaN(bal)) { alert(I18N[LANG].err_amount); return; }
             balancePatch = { balance: bal, balanceFrom: idx };
           }
         }
@@ -506,7 +616,7 @@ $('#btnAdd').onclick=()=>{
   editingId=null;
   fillForm(null);
   showDialogMsg('', true);
-  $('#dlgTitle').textContent='新增项目';
+  $('#dlgTitle').textContent=I18N[LANG].dialog_edit.replace('编辑','新增');
   $('#btnDeleteInDialog').style.display='none';
   $('#dlg').style.display='flex';
 };
@@ -650,13 +760,9 @@ function buildStatsHTML(arr){
       const idx = MonthIndex(months[i]);
       let val = 0;
       if (it.type!=='warranty'){
-        // 统计中也考虑余额抵扣
         const amountInfo = applyBalanceForMonth(it, sorted, m0, idx);
         const rawAmount = amountInfo.amount;
-
-        // 仍然跳过退会期
-        if (rawAmount != null && !isInCancel(it.cancelWindows, idx)) val = rawAmount;
-        if (charge!=null && !isInCancel(it.cancelWindows, idx)) val = charge;
+        if (rawAmount!=null && !isInCancel(it.cancelWindows, idx)) val = rawAmount;
       }
       totals.get(currency)[i] += val;
 
@@ -670,7 +776,7 @@ function buildStatsHTML(arr){
 
   const sectionMonths = [...totals.entries()].map(([cur, arr])=>{
     const rows = arr.map((v,i)=> `<tr><td>${months[i].getFullYear()}-${pad2(months[i].getMonth()+1)}</td><td style="text-align:right">${fmtMoney(v, cur)}</td></tr>`).join('');
-    return `<div class="card"><b>未来12个月总额（${cur}）</b><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr><th style="text-align:left">月份</th><th style="text-align:right">合计</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div class="card"><b>${I18N[LANG].stats_title}（${cur}）</b><table style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr><th style="text-align:left">月份</th><th style="text-align:right">合计</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }).join('');
 
   const sectionCats = [...byCategory.entries()].map(([cur, map])=>{
@@ -706,7 +812,7 @@ async function api(path, init){
     if (r.status===429) throw new Error(data.error || '请求过于频繁，请稍后再试');
     if (r.status===403){ throw new Error(data.error || '安全验证失败，请刷新页面'); }
     if (r.status===401 && !isAuthPath){
-      ONLINE=false; $('#btnUser').textContent='登录/注册'; $('#btnLogout').style.display='none';
+      ONLINE=false; $('#btnUser').textContent=I18N[LANG].login_register; $('#btnLogout').style.display='none';
       DlgAuth.show('login'); hideLoader();
     }
     const msg = data.reason ? `${data.error} (${data.reason})` : (data.error || `HTTP ${r.status}`);
@@ -758,7 +864,7 @@ async function loadCloudItems(){
     allCloudItems.sort((a,b)=>(a.order||0)-(b.order||0));
     if(allCloudItems.length>0 && !allCloudItems.find(it=>it.id===activeId)) activeId = allCloudItems[0].id;
     render();
-  } catch(e){ console.error('加载数据失败:', e.message); }
+  } catch(e){ console.error(I18N[LANG].err_load, e.message); }
   finally{ hideLoader(); }
 }
 async function checkLogin(){
@@ -768,12 +874,14 @@ async function checkLogin(){
     ONLINE=true; $('#btnUser').textContent = me.email; $('#btnLogout').style.display='inline-block';
     await loadCloudItems();
   } catch(e){
-    ONLINE=false; $('#btnUser').textContent='登录/注册'; DlgAuth.show('login'); hideLoader();
+    ONLINE=false; $('#btnUser').textContent=I18N[LANG].login_register; DlgAuth.show('login'); hideLoader();
   }
 }
 
 async function bootstrap(){
-  setLang(LANG); // 初始化按钮文字
+  applyI18n();                 // 初始化界面文案
+  const btn = $('#btnLang');   // 设置按钮简称
+  if (btn) btn.textContent = LANG_SHORT[LANG] || '中';
   await ensureCsrf();
   checkLogin();
 }
@@ -783,7 +891,7 @@ bootstrap();
 $('#btnSendRegCode').onclick = async ()=>{
   const btn = $('#btnSendRegCode');
   const email = $('#reg_em').value.trim();
-  if(!email) return DlgAuth.showMsg('register','请输入邮箱');
+  if(!email) return DlgAuth.showMsg('register', I18N[LANG].email);
   btn.disabled=true; DlgAuth.showMsg('register','发送中...', true);
   try{
     const d = await api('/api/register-send-code', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ email }) });
@@ -811,7 +919,7 @@ $('#goLogin').onclick = async ()=>{
 };
 $('#btnSendResetCode').onclick = async ()=>{
   const btn=$('#btnSendResetCode'); const email=$('#reset_em').value.trim();
-  if(!email) return DlgAuth.showMsg('reset','请输入注册邮箱');
+  if(!email) return DlgAuth.showMsg('reset', I18N[LANG].reg_email);
   btn.disabled=true; DlgAuth.showMsg('reset','发送中...', true);
   try{
     const d = await api('/api/password-reset-send-code', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ email }) });
