@@ -30,18 +30,20 @@
       </div>
     </div>
 
+    <!-- 搜索行：清空 + 统计（本月按钮已删除） -->
     <div class="row">
       <input id="filter" style="flex: 1; min-width: 0;" aria-label="搜索" placeholder="搜索项目/类型/编号/标签/分类..." data-i18n-placeholder="search_placeholder"/>
       <button id="btnClearSearch" class="ghost" data-i18n="clear">清空</button>
-      <button id="btnToday" class="ghost" data-i18n="this_month">本月</button>
+      <button id="btnStats" class="ghost" data-i18n="stats">统计</button>
     </div>
 
+    <!-- 操作行：添加项目 + 编辑项目 + 导入导出 -->
     <div class="row">
       <button id="btnAdd"  class="primary" style="flex: 1;" data-i18n="add_item">添加项目</button>
+      <button id="btnEdit" class="ghost" style="white-space:nowrap;" data-i18n="dialog_edit">编辑项目</button>
       <input id="fileImport" type="file" accept="application/json" style="display:none" />
       <button id="btnImport" class="ghost" data-i18n="import">导入</button>
       <button id="btnExport" class="ghost" data-i18n="export">导出</button>
-      <button id="btnStats" class="ghost" data-i18n="stats">统计</button>
     </div>
   </div>
 
@@ -121,7 +123,8 @@
         </div>
       </fieldset>
 
-      <fieldset>
+      <!-- 这里加 id，方便 JS 对保险隐藏退会期 -->
+      <fieldset id="cancelFieldset">
         <legend data-i18n="legend_cancel">退会（从第 X ～ 第 Y 个月为退会期）</legend>
         <div id="cancelList"></div>
         <div style="margin-top:6px">

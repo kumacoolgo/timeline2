@@ -41,7 +41,12 @@ const I18N = {
     prompt_amount:(idx,cur)=>`设置从第 ${idx} 个月起（直到下一阶段前）的金额：`,
     prompt_balance:(has)=> has ? '可选：设置余额（从本月开始逐月显示剩余，留空不变，0 清除）' : '可选：设置余额（从本月开始逐月显示剩余）',
     err_amount:'金额必须是非负数字',
-    err_load:'加载数据失败：'
+    err_load:'加载数据失败：',
+
+    // 新增：列表里“开始日右边”的提示
+    plan_cancel_start:(m)=>`退会开始月：第 ${m} 个月`,
+    warranty_end_month:(m)=>`保修终了月：第 ${m} 个月`,
+    insurance_expire_month:(m)=>`保险到期月：第 ${m} 个月`,
   },
   en: {
     title:'Expense Timeline',
@@ -72,7 +77,11 @@ const I18N = {
     prompt_amount:(idx,cur)=>`Set amount from month ${idx} (until next phase):`,
     prompt_balance:(has)=> has ? 'Optional balance (starts this month; empty = unchanged, 0 = clear)' : 'Optional balance (starts this month)',
     err_amount:'Amount must be a non-negative number',
-    err_load:'Failed to load: '
+    err_load:'Failed to load: ',
+
+    plan_cancel_start:(m)=>`Cancel window start: month ${m}`,
+    warranty_end_month:(m)=>`Warranty ends: month ${m}`,
+    insurance_expire_month:(m)=>`Policy expires: month ${m}`,
   },
   ja: {
     title:'費用タイムライン',
@@ -103,7 +112,11 @@ const I18N = {
     prompt_amount:(idx,cur)=>`第 ${idx} ヶ月からの金額を設定：`,
     prompt_balance:(has)=> has ? '任意：残高（当月から表示・空欄は変更なし、0でクリア）' : '任意：残高（当月から表示）',
     err_amount:'金額は 0 以上の数値で入力してください',
-    err_load:'読み込みに失敗しました：'
+    err_load:'読み込みに失敗しました：',
+
+    plan_cancel_start:(m)=>`退会開始月：第 ${m} ヶ月`,
+    warranty_end_month:(m)=>`保証終了月：第 ${m} ヶ月`,
+    insurance_expire_month:(m)=>`満期月：第 ${m} ヶ月`,
   }
 };
 
@@ -164,10 +177,19 @@ function syncTypeUI(){
   const t = $('#f_type').value;
   $('#blockPlan').style.display = (t==='plan'||t==='insurance')?'block':'none';
   $('#blockWarranty').style.display = (t==='warranty')?'block':'none';
-  $('#subBlockInsurance').style.display = (t==='insurance')?'block':'none';
+
+  // 周期 & 决算月
   const cycle = $('#f_cycle')?.value || 'monthly';
   const showFiscal = (t==='plan' || t==='insurance') && cycle==='yearly';
-  const fiscalWrap = $('#fiscalWrap'); if (fiscalWrap) fiscalWrap.style.display = showFiscal?'flex':'none';
+  const fiscalWrap = $('#fiscalWrap'); 
+  if (fiscalWrap) fiscalWrap.style.display = showFiscal ? 'flex' : 'none';
+
+  // 保险：显示保期，隐藏退会；套餐/保修：隐藏保期，显示退会
+  const subIns = $('#subBlockInsurance');
+  if (subIns) subIns.style.display = (t === 'insurance') ? 'block' : 'none';
+
+  const cancelFs = $('#cancelFieldset');
+  if (cancelFs) cancelFs.style.display = (t === 'insurance') ? 'none' : 'block';
 }
 
 // === 表单构建 ===
@@ -324,15 +346,18 @@ function render(){
                       it.type === 'insurance' ? `<span class="small" style="color:#10b981">${dict.insurance_label}</span>` :
                       `<span class="small" style="color:#3b82f6">${dict.warranty_label}</span>`;
 
-    let subDetail = '';
-    if (it.type === 'warranty') {
-      if (it.warrantyMonths) subDetail = `<span class="small" style="color:#3b82f6">${dict.label_warranty_months.replace('（月）','')} ${it.warrantyMonths}</span>`;
-    } else if (it.type === 'plan') {
-      if (it.cancelWindows?.length>0) subDetail = `<span class="small" style="color:#6b5cff">${dict.cancel_period} 第 ${it.cancelWindows[0].fromMonth} 个月</span>`;
+    // “开始日右边”的信息：套餐=退会开始月；保修=保修终了月；保险=保险到期月
+    let rightInfo = '';
+    if (it.type === 'plan' && it.cancelWindows?.length > 0) {
+      const first = [...it.cancelWindows].sort((a,b)=>a.fromMonth-b.fromMonth)[0].fromMonth;
+      if (dict.plan_cancel_start) rightInfo = dict.plan_cancel_start(first);
+    } else if (it.type === 'warranty' && it.warrantyMonths) {
+      if (dict.warranty_end_month) rightInfo = dict.warranty_end_month(it.warrantyMonths);
     } else if (it.type === 'insurance') {
-      const y = it.policyTermYears || 0, m = it.policyTermMonths || 0;
-      const termStr = (y>0?`${y}${I18N.zh.years_placeholder}`:'' ) + (m>0?`${m}${I18N.zh.months_placeholder}`:'' );
-      if (termStr) subDetail = `<span class="small" style="color:#10b981">${dict.label_term} ${termStr}</span>`;
+      const total = (Number(it.policyTermYears)||0)*12 + (Number(it.policyTermMonths)||0);
+      if (total > 0 && dict.insurance_expire_month) {
+        rightInfo = dict.insurance_expire_month(total);
+      }
     }
 
     const div = document.createElement('div');
@@ -348,25 +373,19 @@ function render(){
         </div>
         <div class="meta item-line-2">
           <span>${dict.label_start}: ${it.startDate || '-'}</span>
-          ${it.category ? `<span style="margin-left:8px;">· ${it.category}</span>` : ''}
+          ${rightInfo ? `<span style="margin-left:8px;">${rightInfo}</span>` : ''}
+        </div>
+        <div class="meta item-line-3">
+          ${it.category ? `<span>· ${it.category}</span>` : ''}
           ${(it.tags?.length? `<span style="margin-left:8px;">· ${it.tags.join('/')}</span>`:'')}
         </div>
-        <div class="meta item-line-3">${subDetail}</div>
-      </div>
-      <div class="ops">
-        <button class="ghost btnEdit" type="button" data-i18n="dialog_edit">${dict.dialog_edit}</button>
       </div>
     `;
-    div.addEventListener('click', e=>{ if(e.target.closest('button')) return; activeId = it.id; render(); });
-    div.querySelector('.btnEdit').onclick = e => {
-      e.stopPropagation();
-      editingId = it.id;
-      fillForm(allCloudItems.find(x=>x.id===it.id));
-      showDialogMsg('', true);
-      $('#dlgTitle').textContent = dict.dialog_edit;
-      $('#btnDeleteInDialog').style.display = 'inline-block';
-      $('#dlg').style.display='flex';
-    };
+    // 点击只负责“选中”，编辑在顶部“编辑项目”按钮触发
+    div.addEventListener('click', ()=>{
+      activeId = it.id;
+      render();
+    });
 
     // DnD 排序
     div.addEventListener('dragstart', e=>{
@@ -438,7 +457,7 @@ function render(){
       const lastPhaseDate = addMonths(itemStartDate, lastPhaseMonth);
       maxEndCandidate = MaxDate(maxEndCandidate, addMonths(lastPhaseDate, 12));
     }
-    if (it.cancelWindows?.length){
+    if (it.type !== 'insurance' && it.cancelWindows?.length){
       const lastWindow = [...it.cancelWindows].sort((a,b)=>b.toMonth-a.toMonth)[0];
       const lastWindowMonth = (lastWindow.toMonth || 1) - 1;
       const lastWindowDate = addMonths(itemStartDate, lastWindowMonth);
@@ -498,7 +517,7 @@ function render(){
       cells.push(`<div class="cell ${isTodayMonth?'today-month':''}" data-idx="${idx}" style="text-align:center;">${contentDivStart}${badge}${contentDivEnd}</div>`);
     } else {
       const { amount, remainAfter } = applyBalanceForMonth(it, sortedPricePhases, m0, idx);
-      const cancel = isInCancel(it.cancelWindows, idx);
+      const cancel = (it.type !== 'insurance') && isInCancel(it.cancelWindows, idx);
       let segClass = '';
       if (amount!=null){
         let seg=0;
@@ -620,6 +639,21 @@ $('#btnAdd').onclick=()=>{
   $('#btnDeleteInDialog').style.display='none';
   $('#dlg').style.display='flex';
 };
+
+// 顶部“编辑项目”按钮：针对当前选中的 activeId
+$('#btnEdit').onclick = ()=>{
+  if (!activeId) return;
+  const dict = I18N[LANG] || I18N.zh;
+  const it = allCloudItems.find(x=>x.id===activeId);
+  if (!it) return;
+  editingId = it.id;
+  fillForm(it);
+  showDialogMsg('', true);
+  $('#dlgTitle').textContent = dict.dialog_edit;
+  $('#btnDeleteInDialog').style.display = 'inline-block';
+  $('#dlg').style.display = 'flex';
+};
+
 $('#btnClose').onclick=()=>$('#dlg').style.display='none';
 $('#btnCancel').onclick=()=>$('#dlg').style.display='none';
 $('#dlg').addEventListener('click',e=>{ if(e.target.id==='dlg') $('#dlg').style.display='none'; });
@@ -663,8 +697,7 @@ $('#btnDeleteInDialog').onclick = async ()=>{
   } finally { b.disabled=false; }
 };
 
-$('#btnToday').onclick = ()=> scrollToToday('smooth');
-$('#btnClearSearch').onclick = ()=> {
+$('#btnClearSearch').onclick = ()=>{
   $('#filter').value='';
   render();
   $('#filter').focus();
@@ -762,7 +795,9 @@ function buildStatsHTML(arr){
       if (it.type!=='warranty'){
         const amountInfo = applyBalanceForMonth(it, sorted, m0, idx);
         const rawAmount = amountInfo.amount;
-        if (rawAmount!=null && !isInCancel(it.cancelWindows, idx)) val = rawAmount;
+        if (idx >= 1 && rawAmount!=null && !(it.type !== 'insurance' && isInCancel(it.cancelWindows, idx))) {
+          val = rawAmount;
+        }
       }
       totals.get(currency)[i] += val;
 
@@ -835,7 +870,12 @@ const DlgAuth = {
     const timer=setInterval(()=>{ sec--; if(sec<=0){ clearInterval(timer); btn.textContent=txt; btn.disabled=false; } else btn.textContent=`重新发送 (${sec}s)`; },1000);
   }
 };
-$('#btnUser').onclick = ()=>{ $('#login_em').value=''; $('#login_pw').value=''; $('#reg_em').value=''; $('#reg_pw').value=''; $('#reg_code').value=''; $('#reset_em').value=''; $('#reset_code').value=''; $('#reset_pw').value=''; DlgAuth.show('login'); };
+$('#btnUser').onclick = ()=>{
+  $('#login_em').value=''; $('#login_pw').value='';
+  $('#reg_em').value=''; $('#reg_pw').value=''; $('#reg_code').value='';
+  $('#reset_em').value=''; $('#reset_code').value=''; $('#reset_pw').value='';
+  DlgAuth.show('login');
+};
 $('#btnAuthCancel').onclick = ()=> DlgAuth.hide();
 $('#btnRegCancel').onclick = ()=> DlgAuth.hide();
 $('#btnResetCancel').onclick = ()=> DlgAuth.hide();
