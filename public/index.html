@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<title data-i18n="title">费用时间轴</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<div id="loader" class="loader-wrap" style="display:none"><div class="loader-spin"></div></div>
+
+<div class="wrap">
+  <div class="header card">
+    <div class="row" style="justify-content: space-between;">
+      <b data-i18n="title">费用时间轴</b>
+      <div class="auth-group">
+        <button id="btnUser" class="ghost" aria-label="登录或注册" data-i18n="login_register">登录/注册</button>
+        <button id="btnLogout" class="ghost" style="display:none" data-i18n="logout">登出</button>
+
+        <div class="lang-switch">
+          <button id="btnLang" class="ghost" aria-haspopup="menu" aria-expanded="false">中</button>
+          <div id="langMenu" class="lang-menu" role="menu" aria-hidden="true">
+            <button type="button" data-lang="zh" role="menuitem">中文</button>
+            <button type="button" data-lang="en" role="menuitem">English</button>
+            <button type="button" data-lang="ja" role="menuitem">Japanese</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <input id="filter" autocomplete="off" name="search_misc" style="flex: 1; min-width: 0;" aria-label="搜索" placeholder="搜索项目/类型/编号/标签/分类..." data-i18n-placeholder="search_placeholder"/>
+      <button id="btnClearSearch" class="ghost" data-i18n="clear">清空</button>
+      <button id="btnStats" class="ghost" data-i18n="stats">统计</button>
+    </div>
+
+    <div class="row">
+      <button id="btnAdd"  class="primary" style="flex: 1;" data-i18n="add_item">添加项目</button>
+      <button id="btnEdit" class="ghost" style="white-space:nowrap;" data-i18n="dialog_edit">编辑项目</button>
+      <input id="fileImport" type="file" accept="application/json" style="display:none" />
+      <button id="btnImport" class="ghost" data-i18n="import">导入</button>
+      <button id="btnExport" class="ghost" data-i18n="export">导出</button>
+    </div>
+  </div>
+
+  <div id="layout">
+    <div class="card">
+      <div id="leftWrap" aria-label="项目列表"></div>
+    </div>
+
+    <div id="gridContainer" class="card" style="overflow-x: auto;">
+      <div id="gridHead"></div>
+      <div id="grid"></div>
+    </div>
+  </div>
+</div>
+
+<div id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle" style="display:none;">
+  <div id="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="dlgTitle" data-i18n="dialog_edit">编辑项目</h3><button id="btnClose" class="ghost" aria-label="关闭">×</button>
+    </div>
+
+    <div class="row" style="gap:10px">
+      <select id="f_type" style="width: 120px;">
+        <option value="plan" data-i18n="type_plan">套餐</option>
+        <option value="warranty" data-i18n="type_warranty">保修</option>
+        <option value="insurance" data-i18n="type_insurance">保险</option>
+      </select>
+      <input id="f_name" placeholder="项目名称" style="flex: 1; min-width: 0;" data-i18n-placeholder="name_placeholder"/>
+    </div>
+
+    <div class="row" style="gap:10px; margin-top: 8px;">
+      <input id="f_number" placeholder="编号/卡号(可选)" style="width: 100%;" data-i18n-placeholder="number_placeholder"/>
+    </div>
+
+    <div class="row" style="gap:10px; margin-top: 8px; align-items: center;">
+      <label class="small" for="f_start" data-i18n="label_start">开始日</label>
+      <input id="f_start" type="date" style="width: 140px;"/>
+      <label class="small" for="f_currency" data-i18n="label_currency">货币</label>
+      <select id="f_currency" style="width: 120px;">
+        <option value="CNY">CNY ￥</option>
+        <option value="JPY">JPY ¥</option>
+        <option value="USD">USD $</option>
+        <option value="EUR">EUR €</option>
+      </select>
+    </div>
+
+    <div class="row" style="gap:10px; margin-top: 8px;">
+      <input id="f_category" placeholder="分类（可选）" style="width: 50%;" data-i18n-placeholder="category_placeholder"/>
+      <input id="f_tags" placeholder="标签，用逗号分隔（可选）" style="flex:1; min-width: 0;" data-i18n-placeholder="tags_placeholder"/>
+    </div>
+
+    <div id="blockPlan">
+      <div class="row" style="gap:10px; margin-top: 8px;">
+        <label class="small" data-i18n="label_cycle">周期</label>
+        <select id="f_cycle" style="width: 120px;">
+          <option value="monthly" data-i18n="cycle_monthly">月度</option>
+          <option value="yearly" data-i18n="cycle_yearly">年次</option>
+        </select>
+        <div id="fiscalWrap" class="row" style="gap:6px; display:none;">
+          <label class="small" data-i18n="label_fiscal">决算月</label>
+          <select id="f_fiscal" style="width: 120px;">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+          </select>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend data-i18n="legend_amount">金额（从第 X 个月起，金额 / 月）</legend>
+        <div id="phaseList"></div>
+        <div style="margin-top:6px">
+          <button id="btnAddPhase" class="icon-btn add-btn" type="button" aria-label="添加阶段">➕</button>
+        </div>
+      </fieldset>
+
+      <fieldset id="cancelFieldset">
+        <legend data-i18n="legend_cancel">退会（从第 X ～ 第 Y 个月为退会期）</legend>
+        <div id="cancelList"></div>
+        <div style="margin-top:6px">
+          <button id="btnAddCancel" class="icon-btn add-btn" type="button" aria-label="添加退会期">➕</button>
+        </div>
+      </fieldset>
+
+      <div id="subBlockInsurance" style="display:none; margin-top:8px;">
+        <label class="small" data-i18n="label_term">保期</label>
+        <input id="f_ins_y" type="number" min="0" placeholder="年" style="width:80px" data-i18n-placeholder="years_placeholder">
+        <input id="f_ins_m" type="number" min="0" max="11" placeholder="月" style="width:80px" data-i18n-placeholder="months_placeholder">
+      </div>
+    </div>
+
+    <div id="blockWarranty" style="display:none;margin-top:8px">
+      <label class="small" data-i18n="label_warranty_months">保修期（月）</label>
+      <input id="f_wm" type="number" min="0" value="24" style="width:120px"/>
+    </div>
+
+    <div id="dlg_msg" class="small" style="color:#ef4444; margin-top: 10px; text-align: right;"></div>
+
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px">
+      <button id="btnDeleteInDialog" class="ghost" type="button" style="color: #d93025; background: #fff0f0; border-color: #f5c6cb; display: none;" data-i18n="delete">删除</button>
+      <div>
+        <button id="btnCancel" class="ghost" type="button" data-i18n="cancel">取消</button>
+        <button id="btnSave" class="primary" type="button" data-i18n="save">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="dlgStats" role="dialog" aria-modal="true" aria-labelledby="dlgStatsTitle" style="display:none;">
+  <div class="card" style="width:min(820px,92vw); max-height:92vh; overflow:auto; padding:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="dlgStatsTitle" data-i18n="stats_title">统计与汇总</h3>
+      <button id="btnCloseStats" class="ghost" aria-label="关闭统计">×</button>
+    </div>
+
+    <div id="statsContent" class="row" style="gap:10px; flex-direction:column;">
+      </div>
+  </div>
+</div>
+
+<div id="dlgAuth" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;z-index:9999">
+  <div class="card" style="width:min(520px,92vw);padding:14px">
+    <div id="viewLogin" class="auth-view active">
+      <h3 data-i18n="login">登录</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="login_em" placeholder="邮箱" data-i18n-placeholder="email"/>
+        <input id="login_pw" type="password" placeholder="密码" data-i18n-placeholder="password"/>
+        <div id="login_msg" class="small" style="color:#ef4444"></div>
+        <div class="row" style="justify-content: space-between;">
+          <button class="link-btn" id="btnGoReset" type="button" data-i18n="forgot_pwd">忘记密码？</button>
+          <div>
+            <button id="btnAuthCancel" class="ghost" type="button" data-i18n="cancel">取消</button>
+            <button id="btnGoReg" class="ghost" type="button" data-i18n="register">注册</button>
+            <button id="goLogin" class="primary" type="button" data-i18n="login">登录</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="viewRegister" class="auth-view">
+      <h3 data-i18n="register">注册</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="reg_em" placeholder="邮箱" data-i18n-placeholder="email"/>
+        <input id="reg_pw" type="password" placeholder="密码（≥10位）" data-i18n-placeholder="password10"/>
+        <div class="row" style="gap: 8px;">
+          <input id="reg_code" placeholder="6位验证码" style="flex: 1; min-width: 0;" data-i18n-placeholder="code6"/>
+          <button id="btnSendRegCode" class="ghost" type="button" data-i18n="send_code">发送验证码</button>
+        </div>
+        <div id="reg_msg" class="small" style="color:#ef4444"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="btnRegCancel" class="ghost" type="button" data-i18n="cancel">取消</button>
+          <button id="btnGoLogin" class="ghost" type="button" data-i18n="back_login">返回登录</button>
+          <button id="goReg" class="primary" type="button" data-i18n="confirm_register">确认注册</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="viewReset" class="auth-view">
+      <h3 data-i18n="reset_pwd">重置密码</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="reset_em" placeholder="注册邮箱" data-i18n-placeholder="reg_email"/>
+        <div class="row" style="gap: 8px;">
+          <input id="reset_code" placeholder="6位验证码" style="flex: 1; min-width: 0;" data-i18n-placeholder="code6"/>
+          <button id="btnSendResetCode" class="ghost" type="button" data-i18n="send_code">发送验证码</button>
+        </div>
+        <input id="reset_pw" type="password" placeholder="新密码（≥10位）" data-i18n-placeholder="new_password10"/>
+        <div id="reset_msg" class="small" style="color:#ef4444"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="btnResetCancel" class="ghost" type="button" data-i18n="cancel">取消</button>
+          <button id="btnGoLoginReset" class="ghost" type="button" data-i18n="back_login">返回登录</button>
+          <button id="goReset" class="primary" type="button" data-i18n="confirm_reset">确认重置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js" defer></script>
+</body>
+</html>
